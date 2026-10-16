@@ -1,0 +1,47 @@
+#env
+.env
+*.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+
+# 2. PYTHON / FASTAPI DEPENDENCIES
+.venv/
+venv/
+ENV/
+env/
+
+# Python caching files
+**/__pycache__/
+*.py[cod]
+*\$py.class
+.pytest_cache/
+.mypy_cache/
+
+
+# 3. JAVASCRIPT / VITE DEPENDENCIES
+
+**/node_modules/
+.pnpm-store/
+
+# Vite production build output (if someone runs a local build test)
+**/dist/
+*.local
+
+
+# 4. SYSTEM & EDITOR CLUTTER (For all 4 team members)
+
+# VS Code settings and workspaces
+.vscode/
+*.code-workspace
+
+# JetBrains / PyCharm / WebStorm
+.idea/
+
+# Operating System Files
+.DS_Store
+Thumbs.db
+desktop.ini
