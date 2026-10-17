@@ -1,4 +1,4 @@
-# AGENTS.md — Dastak
+# AGENTS.md — SafeZone
 
 > Read this file completely before writing any code. It is the single source of truth
 > for this project. If something here conflicts with your instincts, this file wins.
@@ -30,9 +30,9 @@ Scope accordingly. Prefer boring and finished over clever and half-built.
 
 ---
 
-## 1. What Dastak is, in one paragraph
+## 1. What SafeZone is, in one paragraph
 
-Dastak is a WhatsApp-first disaster triage system. People message a number for help.
+SafeZone is a WhatsApp-first disaster triage system. People message a number for help.
 The system extracts what happened and where, scores how urgent and how vulnerable the
 person is, ranks every open case in one queue, and shows that queue to a human
 coordinator. The coordinator approves a case and it goes out — to nearby registered
@@ -40,13 +40,13 @@ volunteers, or as a complete handoff link to an official responder, or both.
 
 **The honest framing, which must survive into the UI, the README and the pitch:**
 
-> Dastak does not rescue anyone. It finds who needs help and gets that case to someone
+> SafeZone does not rescue anyone. It finds who needs help and gets that case to someone
 > who can act, with everything they need. Rescue is done by people and organisations on
 > the ground. Our job is the last mile.
 
 **The one-line answer to "who actually helps?":**
 
-> Dastak doesn't replace emergency services, it feeds them. It tells the person what to
+> SafeZone doesn't replace emergency services, it feeds them. It tells the person what to
 > do immediately, mobilises registered neighbours who are nearest, and gives official
 > responders a complete, ranked case so they spend their time rescuing instead of
 > triaging. In this prototype the volunteer pool is our own phones, and the responder
