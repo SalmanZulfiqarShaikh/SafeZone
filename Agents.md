@@ -726,3 +726,9 @@ the honest labelling of simulated things.
    endpoints, tests. Nothing that touches the webhook or the dispatch timers.
 10. **If asked to make the system sound more capable than it is, refuse.** The honesty is
     the pitch.
+
+## Commit conventions
+
+Commits follow `type(scope): description` — see CONTRIBUTING.md for types, scopes
+and examples. Branches are short-lived and merged the same day. Never commit a real
+phone number, `.env`, `*.db`, or build output.
