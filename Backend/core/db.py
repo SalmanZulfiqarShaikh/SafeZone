@@ -1,4 +1,4 @@
-"""Supabase database access for Dastak.
+"""Supabase database access for SafeZone.
 
 One data layer only: PostgreSQL via Supabase. ``MOCK_MODE`` affects WhatsApp
 sends and LLM extraction, never storage. Environment separation (dev vs prod)
@@ -17,7 +17,7 @@ from typing import Any
 
 from core.config import SUPABASE_SERVICE_KEY, SUPABASE_URL
 
-logger = logging.getLogger("dastak.db")
+logger = logging.getLogger("safezone.db")
 
 _supabase_client = None
 
@@ -49,7 +49,7 @@ def get_db():
     if not SUPABASE_URL or not SUPABASE_SERVICE_KEY:
         raise DbError(
             "SUPABASE_URL and SUPABASE_SERVICE_KEY must be set. "
-            "Dastak has no in-memory fallback database."
+            "SafeZone has no in-memory fallback database."
         )
 
     try:

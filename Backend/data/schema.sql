@@ -1,5 +1,5 @@
 -- ─────────────────────────────────────────────────────────────────────────────
--- Dastak Database Schema for Supabase (PostgreSQL)
+-- SafeZone Database Schema for Supabase (PostgreSQL)
 -- Strictly implements AGENTS.md §5 (Data model) and §2 (Non-negotiables)
 -- ─────────────────────────────────────────────────────────────────────────────
 
@@ -12,6 +12,9 @@ CREATE TABLE IF NOT EXISTS zones (
     id TEXT PRIMARY KEY,                       -- e.g. 'gulshan', 'surjani', 'lyari'
     name TEXT NOT NULL,                        -- e.g. 'Gulshan-e-Iqbal'
     risk_level TEXT DEFAULT 'normal',          -- 'normal' | 'elevated' | 'critical'
+    lat DOUBLE PRECISION,                      -- approximate centre, for ranking only
+    lng DOUBLE PRECISION,                      -- never shown to a responder as a person's location
+    volunteer_group TEXT,                      -- which volunteer covers this area ('a' | 'b')
     boundary_geojson JSONB,                    -- GeoJSON polygon/multipolygon
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -161,6 +164,44 @@ CREATE TABLE IF NOT EXISTS responder_links (
     expires_at TIMESTAMPTZ NOT NULL
 );
 
+-- ─── 9b. REGISTRATIONS ───────────────────────────────────────────────────────
+-- Website sign-ups waiting for their WhatsApp handshake. Registration is the
+-- optional alerts path, never the front door: anyone can message SafeZone with
+-- no account and get the full help ladder.
+--
+-- No phone number is captured at the form. The number is whichever one sends
+-- JOIN <code> -- the only one we can prove is reachable, and the only one Meta
+-- lets us message afterwards.
+CREATE TABLE IF NOT EXISTS registrations (
+    code TEXT PRIMARY KEY,                     -- short, single use, expires
+    first_name TEXT NOT NULL,
+    zone_id TEXT REFERENCES zones(id),
+    phone TEXT,                                -- filled in on redemption
+    wants_alerts BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    expires_at TIMESTAMPTZ NOT NULL,
+    redeemed_at TIMESTAMPTZ
+);
+
+-- Redemption looks a code up directly; this index serves the "which
+-- registration belongs to this phone" lookup.
+CREATE INDEX IF NOT EXISTS idx_registrations_phone ON registrations(phone);
+
+-- ─── 9c. ZONE ALERTS ─────────────────────────────────────────────────────────
+-- Which registered person has already been warned about which incident. The
+-- unique index is the dedup rule: a second alert about the same event is worse
+-- than a missed one, because alert fatigue is a safety failure.
+CREATE TABLE IF NOT EXISTS zone_alerts (
+    id BIGSERIAL PRIMARY KEY,
+    incident_id BIGINT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+    person_id BIGINT NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+    zone_id TEXT REFERENCES zones(id),
+    sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_zone_alerts_incident_person
+    ON zone_alerts(incident_id, person_id);
+
 -- ─── 10. OUTBOX ──────────────────────────────────────────────────────────────
 -- Every outbound message in both modes. This is the message audit log and the
 -- primary debugging surface when the demo misbehaves.
@@ -185,6 +226,15 @@ CREATE TABLE IF NOT EXISTS outbox (
 );
 
 -- Bring pre-existing outbox tables up to the current shape.
+ALTER TABLE zones ADD COLUMN IF NOT EXISTS lat DOUBLE PRECISION;
+ALTER TABLE zones ADD COLUMN IF NOT EXISTS lng DOUBLE PRECISION;
+ALTER TABLE zones ADD COLUMN IF NOT EXISTS volunteer_group TEXT;
+
+-- How we came by an incident's coordinates. 'pin' is exact and came from the
+-- person; 'area' is an area centre we substituted so the case could be ranked
+-- and offered at all. A responder is only ever shown a 'pin'.
+ALTER TABLE incidents ADD COLUMN IF NOT EXISTS location_source TEXT;
+
 ALTER TABLE outbox ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'mock';
 ALTER TABLE outbox ADD COLUMN IF NOT EXISTS suppressed_reason TEXT;
 
@@ -265,3 +315,5 @@ ALTER TABLE volunteers       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE dispatches       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE responder_links  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outbox           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE registrations    ENABLE ROW LEVEL SECURITY;
+ALTER TABLE zone_alerts      ENABLE ROW LEVEL SECURITY;

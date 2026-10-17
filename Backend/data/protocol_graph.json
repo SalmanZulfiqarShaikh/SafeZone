@@ -1,0 +1,94 @@
+{
+  "version": 1,
+  "categories": {
+    "flood": {
+      "label": "Flooding",
+      "emergency_kind": "medical",
+      "official_first": false,
+      "volunteer_eligible": true,
+      "safety_steps": [
+        "Move to the highest floor you can reach safely.",
+        "Stay away from electrical switches, sockets and wet wiring.",
+        "Do not walk or drive through moving floodwater."
+      ],
+      "questions": [
+        "Where are you? Send your location pin, or tell me the nearest landmark.",
+        "Is anyone with you unable to move on their own?"
+      ]
+    },
+    "fire": {
+      "label": "Fire",
+      "emergency_kind": "fire",
+      "official_first": true,
+      "volunteer_eligible": true,
+      "safety_steps": [
+        "Get out of the building now if you can, and stay out.",
+        "Stay low where there is smoke.",
+        "Do not use a lift."
+      ],
+      "questions": [
+        "Where are you? Send your location pin, or tell me the nearest landmark.",
+        "Is everyone out of the building?"
+      ]
+    },
+    "medical": {
+      "label": "Medical emergency",
+      "emergency_kind": "medical",
+      "official_first": true,
+      "volunteer_eligible": true,
+      "safety_steps": [
+        "Call the ambulance number above first.",
+        "Stay with the person and keep them still.",
+        "Keep the route to them clear so help can reach you."
+      ],
+      "questions": [
+        "Where are you? Send your location pin, or tell me the nearest landmark.",
+        "Is the person conscious and breathing?"
+      ]
+    },
+    "trapped": {
+      "label": "Trapped or stranded",
+      "emergency_kind": "medical",
+      "official_first": false,
+      "volunteer_eligible": true,
+      "safety_steps": [
+        "Stay where you are if moving is unsafe.",
+        "Make yourself visible from outside if you can.",
+        "Save your phone battery; send short messages."
+      ],
+      "questions": [
+        "Where are you? Send your location pin, or tell me the nearest landmark.",
+        "How many people are with you?"
+      ]
+    },
+    "structural": {
+      "label": "Building damage",
+      "emergency_kind": "fire",
+      "official_first": true,
+      "volunteer_eligible": false,
+      "safety_steps": [
+        "Leave the building if you can do so safely.",
+        "Stay clear of damaged walls, ceilings and balconies.",
+        "Do not re-enter to collect belongings."
+      ],
+      "questions": [
+        "Where are you? Send your location pin, or tell me the nearest landmark.",
+        "Is anyone still inside?"
+      ]
+    },
+    "other": {
+      "label": "Emergency",
+      "emergency_kind": "police",
+      "official_first": false,
+      "volunteer_eligible": true,
+      "safety_steps": [
+        "Move somewhere safe if you can.",
+        "Stay where you can be reached by phone."
+      ],
+      "questions": [
+        "Where are you? Send your location pin, or tell me the nearest landmark.",
+        "What do you need most right now?"
+      ]
+    }
+  }
+}

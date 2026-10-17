@@ -1,4 +1,4 @@
-"""Application configuration for Dastak.
+"""Application configuration for SafeZone.
 
 Handles environment loading, defaults and the checks that catch a demo-killing
 misconfiguration before it happens. Values follow AGENTS.md §12; the unsafe
@@ -17,7 +17,7 @@ from dotenv import load_dotenv
 # Load .env from the project root (find_dotenv walks up from this file).
 load_dotenv()
 
-logger = logging.getLogger("dastak.config")
+logger = logging.getLogger("safezone.config")
 
 
 def _get_bool(key: str, default: bool) -> bool:
@@ -57,10 +57,42 @@ ALLOWLIST_ONLY: bool = _get_bool("ALLOWLIST_ONLY", True)
 KILL_SWITCH: bool = _get_bool("KILL_SWITCH", False)
 
 # ─── DISPATCH SETTINGS ─────────────────────────────────────────
+# Bare greetings ("hi", "salam", "test") never open a case. This flag only
+# decides whether the one orientation line is sent back; the filter itself is
+# deterministic and always on -- see ``services/intake.is_greeting``.
+GREETING_REPLY: bool = _get_bool("GREETING_REPLY", True)
+
+# ─── AREA ALERTS ───────────────────────────────────────────────────────────
+# Proactive warnings to registered people. Gated hard on purpose: a system
+# that messages about every report trains people to ignore it, and alert
+# fatigue during a disaster is a safety failure, not a UX one.
+ZONE_ALERTS_ENABLED: bool = _get_bool("ZONE_ALERTS_ENABLED", True)
+# 0.75 is "high" on the risk scale; see services/risk.URGENCY_SCORES.
+ZONE_ALERT_MIN_URGENCY: float = float(os.getenv("ZONE_ALERT_MIN_URGENCY", "0.75"))
+# Corroboration is its own kind of severity.
+ZONE_ALERT_MIN_REPORTS: int = _get_int("ZONE_ALERT_MIN_REPORTS", 3)
+# One incident must not be able to exhaust GLOBAL_MESSAGE_CAP.
+ZONE_ALERT_MAX_RECIPIENTS: int = _get_int("ZONE_ALERT_MAX_RECIPIENTS", 50)
+
+# Website registration: how long a JOIN code stays valid. Short enough that
+# a leaked code is useless, long enough to switch apps and type it.
+REGISTRATION_CODE_TTL_MINUTES: int = _get_int("REGISTRATION_CODE_TTL_MINUTES", 30)
+
+# SafeZone's own public WhatsApp number, used to build wa.me join links.
+# The repo is public: this stays empty here and is set per deployment.
+WHATSAPP_PUBLIC_NUMBER: str = os.getenv("WHATSAPP_PUBLIC_NUMBER", "").strip().lstrip("+")
+
 VOLUNTEER_OFFER_RING_SIZE: int = _get_int("VOLUNTEER_OFFER_RING_SIZE", 3)
 VOLUNTEER_ACCEPT_TIMEOUT_S: int = _get_int("VOLUNTEER_ACCEPT_TIMEOUT_S", 300)
 VOLUNTEER_ARRIVE_TIMEOUT_S: int = _get_int("VOLUNTEER_ARRIVE_TIMEOUT_S", 900)
+# How long to wait for "1 yes / 2 no" after a case is marked done. Silence is
+# treated as a failure to confirm, and reopens the case.
+PERSON_SILENCE_TIMEOUT_S: int = _get_int("PERSON_SILENCE_TIMEOUT_S", 900)
 GLOBAL_MESSAGE_CAP: int = _get_int("GLOBAL_MESSAGE_CAP", 500)
+# Absolute base for responder links handed to official desks. Relative links
+# work locally; set this to the deployed origin before the demo.
+PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+RESPONDER_LINK_TTL_HOURS: int = _get_int("RESPONDER_LINK_TTL_HOURS", 24)
 
 # Per-number rate limiting, enforced inside send_message().
 PER_NUMBER_RATE_LIMIT: int = _get_int("PER_NUMBER_RATE_LIMIT", 10)
@@ -86,6 +118,21 @@ if _raw_demo_volunteers:
 EMERGENCY_FIRE: str = os.getenv("EMERGENCY_FIRE", "").strip()
 EMERGENCY_AMBULANCE: str = os.getenv("EMERGENCY_AMBULANCE", "").strip()
 EMERGENCY_POLICE: str = os.getenv("EMERGENCY_POLICE", "").strip()
+
+# During a demo these point at a team phone rather than the real fire brigade,
+# ambulance service or police. When that is true every message carrying one
+# says so, because the alternative is telling a stranger in an emergency to
+# call a number that will not answer. Defaults to DEMO_MODE so the unsafe
+# state has to be chosen deliberately, never reached by forgetting a flag.
+EMERGENCY_NUMBERS_SIMULATED: bool = _get_bool("EMERGENCY_NUMBERS_SIMULATED", DEMO_MODE)
+
+# Appended wherever a simulated emergency number is shown.
+SIMULATED_NUMBER_NOTE = "(demo number, not the real emergency service)"
+
+
+def emergency_number_note() -> str:
+    """The caveat to append to a simulated number, or an empty string."""
+    return f" {SIMULATED_NUMBER_NOTE}" if EMERGENCY_NUMBERS_SIMULATED else ""
 
 
 def get_emergency_number(category: str) -> Optional[str]:
@@ -124,13 +171,46 @@ def get_emergency_number(category: str) -> Optional[str]:
 WHATSAPP_TOKEN: str = os.getenv("WHATSAPP_TOKEN", "").strip()
 WHATSAPP_PHONE_ID: str = os.getenv("WHATSAPP_PHONE_ID", "").strip()
 WHATSAPP_VERIFY_TOKEN: str = os.getenv("WHATSAPP_VERIFY_TOKEN", "").strip()
+# App secret used to verify X-Hub-Signature-256 on inbound webhooks. When
+# empty, verification is skipped (fine for local dev, never for prod).
+WHATSAPP_APP_SECRET: str = os.getenv("WHATSAPP_APP_SECRET", "").strip()
 
 # ─── LLM ───────────────────────────────────────────────────────
-LLM_API_KEY: str = os.getenv("LLM_API_KEY", "").strip()
 # Provider is configuration, not code: swapping it when a provider rate-limits
 # during the event must not require a deploy.
-LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "groq").strip().lower()
+#
+# Two ways to configure this, and they compose:
+#   * LLM_PROVIDERS -- ordered fallback chain, tried left to right
+#   * LLM_PROVIDER  -- single provider, kept so existing .env files work
+#
+# A provider with no key is skipped rather than treated as a failure, so a
+# half-filled .env degrades to whatever is actually set.
+LLM_API_KEY: str = os.getenv("LLM_API_KEY", "").strip()
+LLM_PROVIDER: str = os.getenv("LLM_PROVIDER", "deepseek").strip().lower()
 LLM_MODEL: str = os.getenv("LLM_MODEL", "").strip()
+
+DEFAULT_LLM_PROVIDERS = ("deepseek", "groq", "gemini")
+
+_raw_providers = os.getenv("LLM_PROVIDERS", "").strip()
+LLM_PROVIDERS: List[str] = [
+    name.strip().lower() for name in _raw_providers.split(",") if name.strip()
+] or list(DEFAULT_LLM_PROVIDERS)
+
+# Per-provider credentials. Model defaults live in services/llm.py.
+DEEPSEEK_API_KEY: str = os.getenv("DEEPSEEK_API_KEY", "").strip()
+DEEPSEEK_MODEL: str = os.getenv("DEEPSEEK_MODEL", "").strip()
+
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "").strip()
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", "").strip()
+
+GEMINI_API_KEY: str = os.getenv("GEMINI_API_KEY", "").strip()
+GEMINI_MODEL: str = os.getenv("GEMINI_MODEL", "").strip()
+
+OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "").strip()
+OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "").strip()
+
+OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "").strip()
+OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "").strip()
 
 
 def startup_report() -> List[str]:
@@ -151,11 +231,24 @@ def startup_report() -> List[str]:
     if not EMERGENCY_POLICE:
         problems.append("EMERGENCY_POLICE is not set — other guidance will omit the official number.")
 
+    if EMERGENCY_NUMBERS_SIMULATED and (EMERGENCY_FIRE or EMERGENCY_AMBULANCE or EMERGENCY_POLICE):
+        problems.append(
+            "EMERGENCY_NUMBERS_SIMULATED is on — every emergency number shown "
+            "is labelled as a demo number. Turn it off only when the real "
+            "official numbers are configured."
+        )
+
     if KILL_SWITCH:
         problems.append("KILL_SWITCH is on — every outbound message will be suppressed.")
 
     if not MOCK_MODE and not WHATSAPP_TOKEN:
         problems.append("MOCK_MODE is off but WHATSAPP_TOKEN is empty — WhatsApp sends will fail.")
+
+    if not MOCK_MODE and not WHATSAPP_APP_SECRET:
+        problems.append(
+            "MOCK_MODE is off but WHATSAPP_APP_SECRET is empty — webhook signatures "
+            "will not be verified."
+        )
 
     if ALLOWLIST_ONLY and not DEMO_ALLOWLIST:
         problems.append(

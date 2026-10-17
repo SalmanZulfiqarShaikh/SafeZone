@@ -66,3 +66,6 @@ htmlcov/
 
 #  KEEP THE TEMPLATE
 !.env.example
+
+
+cloudflared.exe

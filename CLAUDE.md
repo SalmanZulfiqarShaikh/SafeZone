@@ -1,4 +1,4 @@
-Work in the Dastak repo. Do this in the order given. Commit at each marked checkpoint. Do not skip the verification steps.
+Work in the SafeZone repo. Do this in the order given. Commit at each marked checkpoint. Do not skip the verification steps.
 
 Part A — Move files into the new structure
 

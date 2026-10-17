@@ -1,4 +1,4 @@
-# Contributing — Dastak
+# Contributing — SafeZone
 
 ## Commit messages
 

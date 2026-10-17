@@ -1,15 +1,24 @@
+import asyncio
 import logging
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
-from core import config
+from core import config, events
 from core.db import get_db
+from routes.admin import router as admin_router
+from routes.cases import router as cases_router
+from routes.events import router as events_router
+from routes.register import router as register_router
+from routes.responder import router as responder_router
+from routes.volunteers import router as volunteers_router
+from routes.webhook import router as webhook_router
+from services import silence
 
-logger = logging.getLogger("dastak.main")
+logger = logging.getLogger("safezone.main")
 
 BASE = Path(__file__).parent
 STATIC_DIR = BASE / "static"
@@ -23,12 +32,22 @@ API_PREFIXES = {"api", "webhook", "events"}
 async def lifespan(app: FastAPI):
     for problem in config.startup_report():
         logger.warning(problem)
+    # emit() may run in worker threads; capture the loop for SSE fan-out.
+    events.set_loop(asyncio.get_running_loop())
     # Fail loudly here rather than silently switching data layers later.
     get_db()
-    yield
+
+    # Re-escalation runs in the background. A bad tick is logged, not fatal.
+    silence_task = asyncio.create_task(silence.run_forever())
+    try:
+        yield
+    finally:
+        silence_task.cancel()
+        with suppress(asyncio.CancelledError):
+            await silence_task
 
 
-app = FastAPI(title="Dastak", lifespan=lifespan)
+app = FastAPI(title="SafeZone", lifespan=lifespan)
 
 
 @app.get("/api/hello")
@@ -36,10 +55,15 @@ def hello():
     return {"message": "Backend Setup done! Waiting for the task"}
 
 
-# API routers FIRST — mounts and the SPA catch-all are greedy.
-# app.include_router(webhook_router)
-# app.include_router(api_router)     # /api/*
-# app.include_router(public_router)  # /api/... JSON only; UI is React
+# API routers FIRST — mounts and the SPA catch-all are greedy. Anything
+# registered after mount_spa() is silently dead.
+app.include_router(webhook_router)
+app.include_router(cases_router)
+app.include_router(volunteers_router)
+app.include_router(responder_router)
+app.include_router(register_router)
+app.include_router(admin_router)
+app.include_router(events_router)
 
 
 def mount_spa(app: FastAPI) -> None:

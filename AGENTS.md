@@ -101,7 +101,7 @@ call target is fine. Calling it an "integration" is not.
 4. **Every phone number goes through `normalize_phone()`** on the way in and on the way to
    storage. This is the single most likely source of a silent demo failure.
 5. **Mock mode means no outbound side effects.** `MOCK_MODE=1` fakes WhatsApp sends and LLM
-   extractions. Storage is always Supabase — the `dastak-dev` project. There is no offline
+   extractions. Storage is always Supabase — the `safezone-dev` project. There is no offline
    fallback: the demo requires network connectivity. This is a deliberate trade-off, named
    in the README.
 
@@ -495,7 +495,7 @@ Straight-line distance, not routed travel time. This is a named trade-off in the
 Build it this way from the start or the webhook gets written twice.**
 
 Website registration and `JOIN <code>` exist **only** to receive proactive alerts about
-your area. They are optional. Anyone can message the Dastak number and get the full help
+your area. They are optional. Anyone can message the SafeZone number and get the full help
 ladder with no account, no code, no area.
 
 | | Registered (optional) | Direct help (default) |
@@ -626,7 +626,7 @@ and we say so openly.
 - [ ] Both numbers in `DEMO_VOLUNTEERS` on prod only, and in `DEMO_ALLOWLIST`
 - [ ] Both numbers added as approved recipients in Meta, if still on a test number
 - [ ] Both phones sent `ON DUTY`
-- [ ] Both phones messaged the Dastak number within the last 24 hours
+- [ ] Both phones messaged the SafeZone number within the last 24 hours
 - [ ] Demo mode on, 60–90 s accept timeout
 - [ ] Emergency numbers filled from official sources
 - [ ] Responder link opened and tested on a phone
@@ -660,7 +660,7 @@ option, not the front door.
 - [ ] The responder link opens on a phone with map, Navigate and case summary
 - [ ] No volunteer phone number appears in the repo or on any public page
 - [ ] Location-unknown cases are flagged and cannot be dispatched to volunteers
-- [ ] The whole demo runs with `MOCK_MODE=1` against `dastak-dev`, with no WhatsApp or
+- [ ] The whole demo runs with `MOCK_MODE=1` against `safezone-dev`, with no WhatsApp or
       LLM calls
 
 ---

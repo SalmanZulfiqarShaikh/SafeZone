@@ -1,4 +1,4 @@
-"""Phone normalization contract for Dastak.
+"""Phone normalization contract for SafeZone.
 
 Strictly follows AGENTS.md §2.3 Rule 4 and §6.
 Every phone number goes through normalize_phone() on the way in and on the way
