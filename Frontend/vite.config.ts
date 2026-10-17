@@ -8,7 +8,7 @@ export default defineConfig({
   resolve: {
     alias: { "@": path.resolve(import.meta.dirname, "./src") },
   },
-  base: "/app/",
+  base: "/",
   build: {
     outDir: "../Backend/static",
     emptyOutDir: true,
