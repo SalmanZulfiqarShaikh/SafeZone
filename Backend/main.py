@@ -1,26 +1,29 @@
-import os
+from pathlib import Path
+
 from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
 # Load variables from .env
 load_dotenv()
 
-app = FastAPI()
+BASE = Path(__file__).parent
+app = FastAPI(title="Dastak")
+templates = Jinja2Templates(directory=BASE / "templates")
 
-# CRITICAL: Allow your Vite frontend to talk to this backend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:5173"], # Default Vite port
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-
-@app.get("/")
-def home():
-    return {"status": "Backend is running!"}
 
 @app.get("/api/hello")
 def hello():
     return {"message": "Backend Setup done! Waiting for the task"}
+
+
+# Routes FIRST — mounts are greedy and will swallow anything registered after them.
+# app.include_router(webhook_router)
+# app.include_router(api_router)     # /api/*
+# app.include_router(public_router)  # / and /r/{token}, Jinja
+
+# Control room bundle last.
+static_dir = BASE / "static"
+if static_dir.exists():
+    app.mount("/app", StaticFiles(directory=static_dir, html=True), name="control")

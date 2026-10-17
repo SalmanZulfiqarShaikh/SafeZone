@@ -45,3 +45,24 @@ env/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+
+Backend/static/
+
+# DATABASE
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+*.db-wal
+*.db-shm
+
+#  LOGS & COVERAGE
+*.log
+logs/
+.coverage
+htmlcov/
+.ruff_cache/
+
+#  KEEP THE TEMPLATE
+!.env.example
