@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 from core import config
 from routes import cases as cases_routes
 from routes import store
-from services import dispatch, officials, silence
+from services import approval, dispatch, officials, silence
 from tests.fake_db import FakeDB
 
 
@@ -55,22 +55,40 @@ def test_fire_and_medical_always_require_an_official_handoff(category):
 # ─── Honesty ───────────────────────────────────────────────────────────────
 
 
-def test_every_handoff_is_marked_simulated():
+def test_a_handoff_is_always_flagged_simulated_in_the_data():
+    """The flag the UI reads is always set, whatever the message text says."""
     for category in ("fire", "medical", "flood", "trapped", "structural", "other"):
-        record = officials.handoff(category)
-        assert record["simulated"] is True
-        assert "simulated" in record["target_label"].lower()
+        assert officials.handoff(category)["simulated"] is True
 
 
-def test_a_coordinator_label_is_kept_but_still_marked_simulated():
+def test_message_labels_are_off_by_default():
+    """In a controlled demo every recipient is allow-listed and already knows."""
+    assert config.SHOW_SIMULATION_LABELS is False
+    assert "simulated" not in officials.handoff("fire")["target_label"].lower()
+
+
+def test_labels_appear_when_switched_on(monkeypatch):
+    monkeypatch.setattr(config, "SHOW_SIMULATION_LABELS", True)
+
+    for category in ("fire", "medical", "flood", "trapped", "structural", "other"):
+        assert "simulated" in officials.handoff(category)["target_label"].lower()
+
+
+def test_a_coordinator_label_is_kept(monkeypatch):
+    assert "Chhipa Control Room" in officials.handoff("fire", "Chhipa Control Room")["target_label"]
+
+
+def test_a_coordinator_label_is_marked_when_labels_are_on(monkeypatch):
     """Naming a real desk must not make this look like an integration."""
+    monkeypatch.setattr(config, "SHOW_SIMULATION_LABELS", True)
     record = officials.handoff("fire", "Chhipa Control Room")
 
     assert "Chhipa Control Room" in record["target_label"]
     assert "simulated" in record["target_label"].lower()
 
 
-def test_the_simulated_stamp_is_not_doubled():
+def test_the_simulated_stamp_is_not_doubled(monkeypatch):
+    monkeypatch.setattr(config, "SHOW_SIMULATION_LABELS", True)
     once = officials.target_label("fire")
     twice = officials.target_label("fire", once)
 
@@ -115,6 +133,13 @@ def world(monkeypatch):
         if hasattr(module, "send_message"):
             monkeypatch.setattr(module, "send_message", lambda to, text: True)
 
+    monkeypatch.setattr(
+        approval,
+        "emit",
+        lambda event_type, payload=None, case_id=None: events.append(
+            (event_type, payload or {}, case_id)
+        ),
+    )
     monkeypatch.setattr(
         cases_routes,
         "emit",
@@ -178,7 +203,8 @@ def test_a_flood_case_on_the_volunteer_channel_gets_no_forced_handoff(client, wo
     assert "official_forced" not in body
 
 
-def test_the_responder_link_carries_the_simulated_label(client, world):
+def test_the_responder_link_carries_the_simulated_label(client, world, monkeypatch):
+    monkeypatch.setattr(config, "SHOW_SIMULATION_LABELS", True)
     case_id = seed_case(world["db"], "medical")
 
     client.post(f"/api/proposals/{case_id}/approve", json={"channel": "responder"})
@@ -205,3 +231,102 @@ def test_only_one_link_is_minted_for_a_fire_case_on_both(client, world):
     client.post(f"/api/proposals/{case_id}/approve", json={"channel": "both"})
 
     assert len(world["tables"]["responder_links"]) == 1
+
+
+# ─── The handoff message ───────────────────────────────────────────────────
+
+
+def _handoff_message(monkeypatch, category="fire", **kwargs):
+    sent = []
+    monkeypatch.setattr(
+        officials, "send_message", lambda to, text: sent.append((to, text)) or True
+    )
+    monkeypatch.setattr(config, "OFFICIAL_HANDOFF_AUTOSEND", True)
+
+    record = officials.handoff(category)
+    officials.notify(
+        record,
+        case_id=14,
+        url="https://example.test/r/abc123",
+        category=category,
+        **kwargs,
+    )
+    return sent
+
+
+def test_the_handoff_is_clean_by_default(monkeypatch):
+    sent = _handoff_message(monkeypatch, area="Gulshan-e-Iqbal")
+
+    _to, text = sent[0]
+    assert "simulated" not in text.lower()
+    assert "prototype demonstration" not in text.lower()
+
+
+def test_the_handoff_says_what_it_is_when_labels_are_on(monkeypatch):
+    """Someone reading this on a phone must know inside one sentence."""
+    monkeypatch.setattr(config, "SHOW_SIMULATION_LABELS", True)
+    sent = _handoff_message(monkeypatch, area="Gulshan-e-Iqbal")
+
+    _to, text = sent[0]
+    first_line = text.splitlines()[0].lower()
+    assert "simulated" in first_line
+
+
+def test_the_handoff_denies_dispatching_anyone(monkeypatch):
+    monkeypatch.setattr(config, "SHOW_SIMULATION_LABELS", True)
+    sent = _handoff_message(monkeypatch)
+
+    _to, text = sent[0]
+    assert "has not dispatched anyone" in text
+    assert "no integration" in text.lower()
+
+
+def test_the_handoff_carries_the_case_and_the_link(monkeypatch):
+    sent = _handoff_message(
+        monkeypatch,
+        area="Gulshan-e-Iqbal",
+        reason="Fire, high urgency; elderly, alone; 80% confidence",
+        vuln_summary="elderly, alone",
+    )
+
+    _to, text = sent[0]
+    assert "Case 14" in text
+    assert "Gulshan-e-Iqbal" in text
+    assert "https://example.test/r/abc123" in text
+    assert "elderly, alone" in text
+
+
+def test_the_handoff_goes_to_the_configured_number(monkeypatch):
+    sent = _handoff_message(monkeypatch)
+
+    assert sent[0][0] == "1000000"
+
+
+def test_no_number_means_no_handoff_and_no_crash(monkeypatch):
+    monkeypatch.setattr(config, "EMERGENCY_FIRE", "")
+    sent = _handoff_message(monkeypatch)
+
+    assert sent == []
+
+
+def test_autosend_can_be_switched_off(monkeypatch):
+    sent = []
+    monkeypatch.setattr(
+        officials, "send_message", lambda to, text: sent.append((to, text)) or True
+    )
+    monkeypatch.setattr(config, "OFFICIAL_HANDOFF_AUTOSEND", False)
+
+    assert officials.notify(
+        officials.handoff("fire"), case_id=1, url="u", category="fire"
+    ) is False
+    assert sent == []
+
+
+def test_a_suppressed_handoff_does_not_raise(monkeypatch):
+    """The allowlist or a closed window must not break the approval."""
+    monkeypatch.setattr(officials, "send_message", lambda to, text: False)
+    monkeypatch.setattr(config, "OFFICIAL_HANDOFF_AUTOSEND", True)
+
+    assert officials.notify(
+        officials.handoff("fire"), case_id=1, url="u", category="fire"
+    ) is False

@@ -122,8 +122,13 @@ SAMPLES = (
 )
 
 
-def seed(client=None) -> Dict[str, int]:
-    """Insert the demo data. Returns counts of new rows."""
+def seed(client=None, *, samples: bool = True) -> Dict[str, int]:
+    """Insert the demo data. Returns counts of new rows.
+
+    ``samples=False`` seeds the zones and volunteers but leaves the queue
+    empty, which is what a rehearsal wants: the only case on the board should
+    be the one the tester is about to send.
+    """
     db = client or get_db()
     counts = {"zones": 0, "volunteers": 0, "incidents": 0, "cases": 0}
 
@@ -135,7 +140,7 @@ def seed(client=None) -> Dict[str, int]:
         if _upsert_volunteer(db, volunteer):
             counts["volunteers"] += 1
 
-    for sample in SAMPLES:
+    for sample in SAMPLES if samples else ():
         created = _seed_sample(db, sample)
         if created:
             counts["incidents"] += 1

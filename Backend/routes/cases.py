@@ -20,7 +20,7 @@ from core import config
 from core.events import CASE_APPROVED, RESPONDER_LINK_SENT, emit
 from core.phone import mask
 from routes import store
-from services import dispatch, officials, silence
+from services import approval, dispatch, officials, silence
 
 logger = logging.getLogger("safezone.routes.cases")
 
@@ -61,53 +61,16 @@ def get_case(case_id: int) -> Dict[str, Any]:
 
 @router.post("/api/proposals/{case_id}/approve")
 def approve(case_id: int, body: ApproveRequest) -> Dict[str, Any]:
-    """Approve a proposal and send it out on the chosen channel."""
-    case = _require_case(case_id)
+    """Approve a proposal and send it out on the chosen channel.
 
-    if case.get("status") in ("rejected", "resolved"):
-        raise HTTPException(
-            status_code=409,
-            detail=f"Case {case_id} is {case.get('status')} and cannot be approved.",
-        )
-
-    store.update("cases", {"status": "approved"}, id=case_id)
-    emit(CASE_APPROVED, {"channel": body.channel}, case_id=case_id)
-
-    result: Dict[str, Any] = {"case_id": case_id, "status": "approved", "channel": body.channel}
-
-    incident = (
-        store.select_one("incidents", id=case.get("incident_id"))
-        if case.get("incident_id") is not None
-        else None
-    )
-    category = (incident or {}).get("category") or "other"
-
-    if body.channel in ("volunteers", "both"):
-        offered_ids = dispatch.offer_case(case_id, ring=1)
-        result["offered"] = _offered_view(offered_ids)
-        if not offered_ids:
-            result["dispatch_warning"] = (
-                "No volunteers could be offered this case right now. Check that it "
-                "has a known location, is volunteer-eligible, and that someone is on duty."
-            )
-
-    # Fire and medical are never volunteer-only (AGENTS.md 11), so the official
-    # handoff is forced here rather than left to whoever clicked Approve.
-    official = officials.handoff(category, body.target_label)
-    wants_responder = body.channel in ("responder", "both")
-    if wants_responder or official["required"]:
-        result["responder_link"] = _mint_link(
-            case_id, official["target_label"], service=official["service"]
-        )
-        result["official"] = official
-        if official["required"] and not wants_responder:
-            result["official_forced"] = (
-                f"{official['label']} handoff was created automatically: a "
-                f"{category} case is never volunteer-only."
-            )
-
-    logger.info("Case %s approved on channel %s", case_id, body.channel)
-    return result
+    The work lives in ``services/approval`` so that approving from the control
+    room and approving by WhatsApp cannot drift apart.
+    """
+    try:
+        return approval.approve(case_id, body.channel, body.target_label)
+    except approval.ApprovalError as exc:
+        status = 404 if "not found" in str(exc) else 409
+        raise HTTPException(status_code=status, detail=str(exc)) from exc
 
 
 @router.post("/api/cases/{case_id}/responderlink")
@@ -228,33 +191,5 @@ def _offered_view(volunteer_ids: List[int]) -> List[Dict[str, Any]]:
 def _mint_link(
     case_id: int, target_label: Optional[str], service: Optional[str] = None
 ) -> Dict[str, Any]:
-    token = secrets.token_urlsafe(16)
-    expires_at = (store.now() + timedelta(hours=config.RESPONDER_LINK_TTL_HOURS)).isoformat()
-    store.insert(
-        "responder_links",
-        {
-            "token": token,
-            "case_id": case_id,
-            "target_label": target_label,
-            "expires_at": expires_at,
-        },
-    )
-    path = f"/r/{token}"
-    url = f"{config.PUBLIC_BASE_URL}{path}" if config.PUBLIC_BASE_URL else path
-    emit(
-        RESPONDER_LINK_SENT,
-        {
-            "target_label": target_label,
-            "expires_at": expires_at,
-            "service": service,
-            # Nothing was sent to any organisation. A link was created.
-            "simulated": True,
-        },
-        case_id=case_id,
-    )
-    return {
-        "token": token,
-        "url": url,
-        "expires_at": expires_at,
-        "target_label": target_label,
-    }
+    """Thin passthrough; the minting itself lives in services/approval."""
+    return approval.mint_link(case_id, target_label, service)

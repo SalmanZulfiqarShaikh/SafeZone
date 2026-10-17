@@ -69,3 +69,9 @@ htmlcov/
 
 
 cloudflared.exe
+# Tunnel binaries. cloudflared/ngrok are downloaded per machine, and a
+# 55 MB executable in a public repo is both useless and suspicious.
+*.exe
+
+# Local agent tool permissions. Machine-specific, not shared config.
+.claude/settings.local.json

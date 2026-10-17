@@ -34,7 +34,18 @@ from core.events import (
     VOLUNTEER_REGISTERED,
     emit,
 )
-from services import alerts, dispatch, extract, merge, protocol, registration, risk, silence
+from services import (
+    alerts,
+    approval,
+    coordinator,
+    dispatch,
+    extract,
+    merge,
+    protocol,
+    registration,
+    risk,
+    silence,
+)
 from services.whatsapp import send_message
 
 logger = logging.getLogger("safezone.intake")
@@ -45,6 +56,8 @@ SOURCE_FACTOR_WHATSAPP = 1.0
 
 CASE_COMMAND = re.compile(r"^(ACCEPT|DECLINE|ARRIVED|DONE)\s+(\d+)$", re.I)
 STRAY_REPLY = re.compile(r"^[12]$")
+# Coordinators act by text so no laptop is needed at 3am.
+COORDINATOR_COMMAND = re.compile(r"^(APPROVE|REJECT)\s+#?(\d+)$", re.I)
 
 # Dispatchable cases need coordinates, so a case that opened without a pin is
 # left upgradeable: a pin arriving later re-ranks it in place rather than
@@ -131,6 +144,19 @@ def _handle(
         )
         return
 
+    # People stack commands in one message -- "VOLUNTEER Ali" on the first
+    # line, "ON DUTY" on the second. Read line by line when any line is a
+    # command, or the whole thing is taken as one and the name comes out as
+    # "Ali\nON DUTY" while the second command is silently lost.
+    for part in _split_commands(body):
+        _dispatch_one(phone, person, part)
+        # A later line can depend on an earlier one -- register, then go on
+        # duty -- so re-read the person rather than reuse a stale copy.
+        person = _select_one("people", phone=phone) or person
+
+
+def _dispatch_one(phone: str, person: Mapping[str, Any], body: str) -> None:
+    """Route one message, or one command line out of a stacked message."""
     if _handle_command(phone, person, body):
         return
 
@@ -143,6 +169,35 @@ def _handle(
         return
 
     _handle_help_request(phone, person, body)
+
+
+def _split_commands(body: str) -> list[str]:
+    """Split a stacked command message into lines, or keep it whole.
+
+    Only splits when the message is several lines AND at least one of them is
+    a recognised command. A multi-line report ("water is rising\\nin my
+    house") has no command lines, so it stays one report rather than becoming
+    two nonsense ones.
+    """
+    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    if len(lines) > 1 and any(looks_like_command(line) for line in lines):
+        return lines
+    return [body]
+
+
+def looks_like_command(body: str) -> bool:
+    """True when a line is one of the deterministic commands."""
+    upper = body.strip().upper()
+    if upper in ("STOP", "ON DUTY", "OFF DUTY", "JOIN", "VOLUNTEER"):
+        return True
+    if upper.startswith(("JOIN ", "VOLUNTEER ")):
+        return True
+    stripped = body.strip()
+    return bool(
+        CASE_COMMAND.match(stripped)
+        or STRAY_REPLY.match(stripped)
+        or COORDINATOR_COMMAND.match(stripped)
+    )
 
 
 def is_greeting(body: str) -> bool:
@@ -179,12 +234,16 @@ def _handle_command(phone: str, person: Mapping[str, Any], body: str) -> bool:
         send_message(phone, "You will not receive further alerts. Message me again if you need help.")
         return True
 
+    if COORDINATOR_COMMAND.match(body.strip()):
+        _handle_coordinator_command(phone, body.strip())
+        return True
+
     if upper == "JOIN" or upper.startswith("JOIN "):
         _redeem_registration(phone, body[len("JOIN") :].strip())
         return True
 
     if upper == "VOLUNTEER" or upper.startswith("VOLUNTEER "):
-        _register_volunteer(phone, body[len("VOLUNTEER") :].strip())
+        _register_volunteer(phone, _one_line(body[len("VOLUNTEER") :]))
         return True
 
     if upper in ("ON DUTY", "OFF DUTY"):
@@ -275,6 +334,55 @@ def _handle_case_command(phone: str, body: str) -> None:
         )
 
 
+def _handle_coordinator_command(phone: str, body: str) -> None:
+    """APPROVE / REJECT a case by text, so the coordinator needs no laptop.
+
+    Authorisation is the whole point of this function. ``APPROVE 14`` sent by
+    anyone else would dispatch volunteers to a stranger's emergency, so the
+    sender is checked against ``COORDINATOR_NUMBERS`` before anything happens,
+    and a non-coordinator is told nothing about whether the case exists.
+    """
+    match = COORDINATOR_COMMAND.match(body)
+    if match is None:
+        return
+
+    action = match.group(1).upper()
+    case_id = int(match.group(2))
+
+    if phone not in coordinator.numbers():
+        logger.warning(
+            "Rejected %s for case %s from %s: not a coordinator",
+            action,
+            case_id,
+            mask(phone),
+        )
+        send_message(
+            phone,
+            "Only a coordinator can approve or reject a case. If you need help, "
+            "tell me what is happening and where you are.",
+        )
+        return
+
+    try:
+        if action == "REJECT":
+            approval.reject(case_id, rejected_by=mask(phone))
+            send_message(phone, f"Case {case_id} rejected. Nobody was dispatched.")
+            return
+
+        result = approval.approve(
+            case_id, config.COORDINATOR_DEFAULT_CHANNEL, approved_by=mask(phone)
+        )
+        send_message(phone, approval.summarise(result))
+    except approval.ApprovalError as exc:
+        send_message(phone, str(exc))
+    except Exception:  # noqa: BLE001 - a bad approval must not kill the webhook
+        logger.exception("Coordinator %s could not %s case %s", mask(phone), action, case_id)
+        send_message(
+            phone,
+            f"Something went wrong approving case {case_id}. Try the control room.",
+        )
+
+
 def _redeem_registration(phone: str, code: str) -> None:
     """Finish a website registration started at the form.
 
@@ -319,6 +427,11 @@ def _redeem_registration(phone: str, code: str) -> None:
         f"You are registered{where} and will get area alerts.\n"
         "If you ever need help, just message me what is happening and where you are.",
     )
+
+
+def _one_line(value: str) -> str:
+    """First line only. A name is never multi-line, whatever was typed."""
+    return (value or "").strip().splitlines()[0].strip() if (value or "").strip() else ""
 
 
 def _register_volunteer(phone: str, name: str) -> None:
@@ -652,6 +765,18 @@ def _handle_help_request(
         priority_score,
     )
 
+    # Nothing dispatches until a human approves, so tell them it is waiting.
+    _alert_coordinators(
+        case_id=case_id,
+        category=category,
+        priority_score=priority_score,
+        reason=reason,
+        vuln_summary=_summarise_vulnerability(person_vuln),
+        zone_id=zone_guess,
+        location_known=location_known,
+        report_count=report_count,
+    )
+
     # Warn registered neighbours. Gated on severity inside alerts, and the
     # reporter is excluded -- they already have the full guidance reply.
     _alert_area({**incident_row, "id": incident_id}, person_id)
@@ -772,6 +897,15 @@ def _known_zone(zone_guess: Any) -> Optional[str]:
         zone_id,
     )
     return None
+
+
+def _alert_coordinators(*, zone_id: Optional[str] = None, **fields: Any) -> None:
+    """Tell the coordinators a case is waiting. Never breaks the help path."""
+    try:
+        zone = _select_one("zones", id=zone_id) if zone_id else None
+        coordinator.notify_new_case(area=(zone or {}).get("name"), **fields)
+    except Exception:  # noqa: BLE001 - a notification must not lose the case
+        logger.exception("Could not alert coordinators about case %s", fields.get("case_id"))
 
 
 def _alert_area(incident: Mapping[str, Any], reporter_id: Any) -> None:

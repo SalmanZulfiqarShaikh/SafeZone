@@ -107,14 +107,26 @@ def test_a_real_number_carries_no_caveat(monkeypatch):
     assert "simulated_emergency_number" not in path
 
 
-def test_simulation_defaults_on_so_the_unsafe_state_is_deliberate():
-    """Forgetting a flag must not strip the caveat off a demo number."""
+def test_message_caveats_default_off():
+    """A controlled demo needs no caveat; every recipient is allow-listed."""
     import importlib
 
     from core import config as config_module
 
     reloaded = importlib.reload(config_module)
     try:
-        assert reloaded.EMERGENCY_NUMBERS_SIMULATED == reloaded.DEMO_MODE
+        assert reloaded.SHOW_SIMULATION_LABELS is False
+        assert reloaded.EMERGENCY_NUMBERS_SIMULATED is False
     finally:
         importlib.reload(config_module)
+
+
+def test_startup_warns_when_strangers_could_reach_a_demo_number(monkeypatch):
+    """The one combination that can mislead someone gets said out loud."""
+    monkeypatch.setattr(config, "ALLOWLIST_ONLY", False)
+    monkeypatch.setattr(config, "SHOW_SIMULATION_LABELS", False)
+    monkeypatch.setattr(config, "EMERGENCY_FIRE", "920000000000")
+
+    problems = " ".join(config.startup_report())
+
+    assert "ALLOWLIST_ONLY is off" in problems

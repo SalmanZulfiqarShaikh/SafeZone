@@ -62,6 +62,11 @@ KILL_SWITCH: bool = _get_bool("KILL_SWITCH", False)
 # deterministic and always on -- see ``services/intake.is_greeting``.
 GREETING_REPLY: bool = _get_bool("GREETING_REPLY", True)
 
+# How much SafeZone logs. INFO shows each case being created and which LLM
+# provider answered; DEBUG adds the rest. Never log a full phone number --
+# every log line goes through core.phone.mask.
+LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").strip().upper()
+
 # ─── AREA ALERTS ───────────────────────────────────────────────────────────
 # Proactive warnings to registered people. Gated hard on purpose: a system
 # that messages about every report trains people to ignore it, and alert
@@ -119,19 +124,47 @@ EMERGENCY_FIRE: str = os.getenv("EMERGENCY_FIRE", "").strip()
 EMERGENCY_AMBULANCE: str = os.getenv("EMERGENCY_AMBULANCE", "").strip()
 EMERGENCY_POLICE: str = os.getenv("EMERGENCY_POLICE", "").strip()
 
-# During a demo these point at a team phone rather than the real fire brigade,
-# ambulance service or police. When that is true every message carrying one
-# says so, because the alternative is telling a stranger in an emergency to
-# call a number that will not answer. Defaults to DEMO_MODE so the unsafe
-# state has to be chosen deliberately, never reached by forgetting a flag.
-EMERGENCY_NUMBERS_SIMULATED: bool = _get_bool("EMERGENCY_NUMBERS_SIMULATED", DEMO_MODE)
+# Whether outbound messages carry an in-message "this is a demo" caveat.
+#
+# Off by default. In a controlled demo every recipient is on DEMO_ALLOWLIST
+# and already knows what they are looking at, so the caveat is only clutter.
+#
+# Turn it ON for the one combination that can mislead someone: ALLOWLIST_ONLY
+# switched off, so strangers can reach the system, while the emergency numbers
+# still point at a team phone. startup_report() warns when that happens.
+SHOW_SIMULATION_LABELS: bool = _get_bool("SHOW_SIMULATION_LABELS", False)
 
-# Appended wherever a simulated emergency number is shown.
+# Alias kept so an existing .env setting still works.
+EMERGENCY_NUMBERS_SIMULATED: bool = _get_bool(
+    "EMERGENCY_NUMBERS_SIMULATED", SHOW_SIMULATION_LABELS
+)
+
+# On approval, message the responder link to the configured official number.
+# This is the coordinator's "send this link" step, automated.
+OFFICIAL_HANDOFF_AUTOSEND: bool = _get_bool("OFFICIAL_HANDOFF_AUTOSEND", True)
+
+# ─── COORDINATORS ──────────────────────────────────────────────────────────
+# Approval is the one manual step in the loop, so it is the one place the
+# system can stall silently. Every new case pushes an alert to these
+# numbers. They must also be in DEMO_ALLOWLIST to actually receive it.
+_raw_coordinators = os.getenv("COORDINATOR_NUMBERS", "").strip()
+COORDINATOR_NUMBERS: List[str] = [
+    number.strip() for number in _raw_coordinators.split(",") if number.strip()
+]
+COORDINATOR_NOTIFY: bool = _get_bool("COORDINATOR_NOTIFY", True)
+
+# Channel used when a coordinator approves by text ("APPROVE 14"). "both"
+# offers nearby volunteers AND sends the official handoff, which is what a
+# coordinator with only a phone almost always wants.
+COORDINATOR_DEFAULT_CHANNEL: str = os.getenv(
+    "COORDINATOR_DEFAULT_CHANNEL", "both"
+).strip().lower()
+
 SIMULATED_NUMBER_NOTE = "(demo number, not the real emergency service)"
 
 
 def emergency_number_note() -> str:
-    """The caveat to append to a simulated number, or an empty string."""
+    """The caveat to append to a demo number, or an empty string."""
     return f" {SIMULATED_NUMBER_NOTE}" if EMERGENCY_NUMBERS_SIMULATED else ""
 
 
@@ -231,11 +264,14 @@ def startup_report() -> List[str]:
     if not EMERGENCY_POLICE:
         problems.append("EMERGENCY_POLICE is not set — other guidance will omit the official number.")
 
-    if EMERGENCY_NUMBERS_SIMULATED and (EMERGENCY_FIRE or EMERGENCY_AMBULANCE or EMERGENCY_POLICE):
+    if not ALLOWLIST_ONLY and not SHOW_SIMULATION_LABELS and (
+        EMERGENCY_FIRE or EMERGENCY_AMBULANCE or EMERGENCY_POLICE
+    ):
         problems.append(
-            "EMERGENCY_NUMBERS_SIMULATED is on — every emergency number shown "
-            "is labelled as a demo number. Turn it off only when the real "
-            "official numbers are configured."
+            "ALLOWLIST_ONLY is off and SHOW_SIMULATION_LABELS is off — anyone "
+            "who messages this number will be told to call the configured "
+            "emergency numbers with no caveat. Make sure those are the real "
+            "official numbers."
         )
 
     if KILL_SWITCH:
@@ -248,6 +284,12 @@ def startup_report() -> List[str]:
         problems.append(
             "MOCK_MODE is off but WHATSAPP_APP_SECRET is empty — webhook signatures "
             "will not be verified."
+        )
+
+    if COORDINATOR_NOTIFY and not COORDINATOR_NUMBERS:
+        problems.append(
+            "COORDINATOR_NUMBERS is empty — nobody will be told when a case "
+            "needs approval, so cases will sit in the queue unseen."
         )
 
     if ALLOWLIST_ONLY and not DEMO_ALLOWLIST:

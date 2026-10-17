@@ -24,10 +24,12 @@ database.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Mapping, Optional
 
 from core import config
+from core.phone import mask
 from services import protocol
+from services.whatsapp import send_message
 
 logger = logging.getLogger("safezone.officials")
 
@@ -68,7 +70,7 @@ def target_label(category: str, custom: Optional[str] = None) -> str:
     """
     service = service_for(category)
     base = (custom or "").strip() or SERVICE_LABELS.get(service, "Emergency services")
-    if SIMULATED_SUFFIX in base:
+    if not config.SHOW_SIMULATION_LABELS or SIMULATED_SUFFIX in base:
         return base[:120]
     return f"{base} {SIMULATED_SUFFIX}"[:120]
 
@@ -106,3 +108,72 @@ def handoff(category: str, custom_label: Optional[str] = None) -> Dict[str, Any]
             "sends this link and, where a number is configured, calls it."
         ),
     }
+
+
+def notify(
+    record: Mapping[str, Any],
+    *,
+    case_id: int,
+    url: str,
+    category: str,
+    area: Optional[str] = None,
+    reason: Optional[str] = None,
+    vuln_summary: Optional[str] = None,
+) -> bool:
+    """Send the handoff link to the configured official number.
+
+    This is still not a dispatch. It is the coordinator's "send this link"
+    step, automated to the one number a human put in config -- which during a
+    demo is a team phone, not a real service. Hence the opening and closing
+    lines of the message: anyone reading it on a handset must understand what
+    it is within the first sentence, not after scrolling.
+
+    Returns whether a message actually went out. Never raises: a failed
+    handoff must not fail the approval.
+    """
+    if not config.OFFICIAL_HANDOFF_AUTOSEND:
+        return False
+
+    number = record.get("number")
+    if not number:
+        logger.warning(
+            "Case %s: no official number configured, so no handoff was sent.", case_id
+        )
+        return False
+
+    heading = f"SafeZone {record['label']} handoff"
+    if config.SHOW_SIMULATION_LABELS:
+        heading = f"{heading} {SIMULATED_SUFFIX}"
+
+    lines = [
+        heading,
+        "",
+        f"Case {case_id}: {(category or 'emergency').replace('_', ' ').capitalize()}"
+        + (f" near {area}." if area else "."),
+    ]
+    if vuln_summary:
+        lines.append(f"Who: {vuln_summary}.")
+    if reason:
+        lines.append(f"Why this ranks here: {reason}")
+    lines.append("")
+    lines.append(f"Full case: {url}")
+    if config.SHOW_SIMULATION_LABELS:
+        lines.append("")
+        lines.append(
+            "This is a prototype demonstration. SafeZone has no integration "
+            "with any emergency service and has not dispatched anyone."
+        )
+
+    sent = send_message(number, "\n".join(lines))
+    if sent:
+        logger.info(
+            "Case %s: %s handoff sent to %s", case_id, record["service"], mask(number)
+        )
+    else:
+        logger.warning(
+            "Case %s: %s handoff to %s was suppressed",
+            case_id,
+            record["service"],
+            mask(number),
+        )
+    return sent

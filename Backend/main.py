@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from core import config, events
 from core.db import get_db
+from core.phone import mask
 from routes.admin import router as admin_router
 from routes.cases import router as cases_router
 from routes.events import router as events_router
@@ -28,10 +29,51 @@ STATIC_DIR = BASE / "static"
 API_PREFIXES = {"api", "webhook", "events"}
 
 
+def configure_logging() -> None:
+    """Make SafeZone's own log lines visible.
+
+    uvicorn configures its own loggers and leaves the root logger at WARNING,
+    so without this the only app output is suppression warnings -- "created
+    case 5 (category=flood, priority=0.42)" never appears, and neither does
+    which provider answered. During a demo this log is the clearest view of
+    the system actually reasoning, so it is on by default.
+
+    httpx is pinned to WARNING because the Supabase client logs every single
+    HTTP request at INFO, which buries everything else.
+    """
+    # force=True matters: uvicorn configures logging before it imports this
+    # module, so the root logger already has handlers and a plain basicConfig
+    # would silently do nothing. That is why app INFO lines stay invisible.
+    logging.basicConfig(
+        level=getattr(logging, config.LOG_LEVEL, logging.INFO),
+        format="%(asctime)s %(levelname)-7s %(name)-22s %(message)s",
+        datefmt="%H:%M:%S",
+        force=True,
+    )
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
+
+
+configure_logging()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     for problem in config.startup_report():
         logger.warning(problem)
+
+    # The allowlist is the guard most likely to silently eat a demo, so say
+    # out loud exactly which numbers can receive a message.
+    if config.ALLOWLIST_ONLY:
+        allowed = ", ".join(mask(number) for number in config.DEMO_ALLOWLIST) or "(none)"
+        logger.info(
+            "ALLOWLIST_ONLY is on. %d number(s) may receive messages: %s",
+            len(config.DEMO_ALLOWLIST),
+            allowed,
+        )
+    else:
+        logger.warning("ALLOWLIST_ONLY is off — any number can receive messages.")
+
     # emit() may run in worker threads; capture the loop for SSE fan-out.
     events.set_loop(asyncio.get_running_loop())
     # Fail loudly here rather than silently switching data layers later.

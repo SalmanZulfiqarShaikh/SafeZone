@@ -1,9 +1,14 @@
 """A tiny in-memory stand-in for the Supabase query builder.
 
 Tests use it to exercise the SQL-shaped code paths without a network. It
-supports exactly what SafeZone calls: insert, upsert, update, select, eq and
-limit. It is a test double, not a second data layer -- production code never
-imports this module.
+supports exactly what SafeZone calls: insert, upsert, update, delete, select,
+eq, in_, not_.is_ and limit. It is a test double, not a second data layer --
+production code never imports this module.
+
+Where PostgREST refuses something, this refuses it too. An unfiltered delete
+is the one that matters: PostgREST rejects it rather than emptying a table,
+so the reset script has to pass a match-everything filter, and a test must
+fail if someone drops it.
 """
 
 from collections import defaultdict
@@ -12,6 +17,17 @@ from collections import defaultdict
 class Result:
     def __init__(self, data):
         self.data = data
+
+
+class _Not:
+    """``query.not_.is_(column, "null")``, as the real builder spells it."""
+
+    def __init__(self, query):
+        self.query = query
+
+    def is_(self, column, value):
+        self.query.not_filters.append((column, value))
+        return self.query
 
 
 class Query:
@@ -24,6 +40,11 @@ class Query:
         self.limit_n = None
         self.conflict = None
         self.in_filter = None
+        self.not_filters = []
+
+    @property
+    def not_(self):
+        return _Not(self)
 
     def insert(self, row):
         self.op = "insert"
@@ -45,6 +66,10 @@ class Query:
         self.op = "select"
         return self
 
+    def delete(self):
+        self.op = "delete"
+        return self
+
     def eq(self, column, value):
         self.filters.append((column, value))
         return self
@@ -60,6 +85,9 @@ class Query:
     def _match(self, row):
         if not all(row.get(column) == value for column, value in self.filters):
             return False
+        for column, value in self.not_filters:
+            if value == "null" and row.get(column) is None:
+                return False
         if self.in_filter is not None:
             column, values = self.in_filter
             return row.get(column) in values
@@ -83,7 +111,19 @@ class Query:
             rows.append(row)
             return Result([dict(row)])
 
+        if self.op == "delete" and not (
+            self.filters or self.in_filter or self.not_filters
+        ):
+            # PostgREST refuses this rather than truncating the table.
+            raise RuntimeError("DELETE requires a filter")
+
         matched = [row for row in rows if self._match(row)]
+
+        if self.op == "delete":
+            kept = [row for row in rows if not self._match(row)]
+            rows[:] = kept
+            return Result([dict(row) for row in matched])
+
         if self.op == "update":
             for row in matched:
                 row.update(self.payload)

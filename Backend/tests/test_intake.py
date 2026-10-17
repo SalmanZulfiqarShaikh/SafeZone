@@ -266,3 +266,61 @@ def test_database_failure_never_propagates(world, monkeypatch):
 
     intake.handle_inbound("03001234567", "there is a fire")
     # No exception escaped. Nothing else is guaranteed when the database is down.
+
+
+# ─── Stacked commands in one message ───────────────────────────────────────
+
+
+def test_two_commands_in_one_message_both_run(world):
+    """WhatsApp users type both lines and send once. Both must take effect."""
+    intake.handle_inbound("923001234567", "VOLUNTEER Salman\nON DUTY")
+
+    volunteer = world["tables"]["volunteers"][0]
+    assert volunteer["name"] == "Salman"
+    assert volunteer["status"] == "on_duty"
+
+
+def test_a_name_never_carries_a_newline(world):
+    intake.handle_inbound("923001234567", "Volunteer Salman\nOn duty")
+
+    assert "\n" not in world["tables"]["volunteers"][0]["name"]
+
+
+def test_a_multi_line_report_is_not_split(world):
+    """No command lines, so this stays one report, not three."""
+    intake.handle_inbound(
+        "923001234567",
+        "water is rising in my house\nin Gulshan\nmy mother is elderly",
+    )
+
+    assert len(world["tables"]["cases"]) == 1
+
+
+def test_a_command_plus_a_report_does_both(world):
+    intake.handle_inbound(
+        "923001234567", "ON DUTY\nthere is a fire in my kitchen in Gulshan"
+    )
+
+    assert len(world["tables"]["cases"]) == 1
+    assert world["tables"]["cases"][0]["reason"]
+
+
+@pytest.mark.parametrize(
+    "line,expected",
+    [
+        ("ON DUTY", True),
+        ("on duty", True),
+        ("OFF DUTY", True),
+        ("STOP", True),
+        ("VOLUNTEER Ali", True),
+        ("JOIN ABC123", True),
+        ("ACCEPT 14", True),
+        ("DONE 3", True),
+        ("1", True),
+        ("water is rising", False),
+        ("hello", False),
+        ("", False),
+    ],
+)
+def test_command_detection(line, expected):
+    assert intake.looks_like_command(line) is expected

@@ -12,7 +12,7 @@ from fastapi import HTTPException
 
 from core import config
 from routes import admin, cases, responder, store, volunteers
-from services import silence
+from services import approval, silence
 from tests.fake_db import FakeDB
 
 
@@ -39,6 +39,14 @@ def world(monkeypatch):
     monkeypatch.setattr(silence, "execute", lambda query: query.execute())
     monkeypatch.setattr(silence, "emit", lambda *args, **kwargs: None)
 
+    # Approval work moved into services/approval; it emits and reads there.
+    monkeypatch.setattr(
+        approval,
+        "emit",
+        lambda event_type, payload=None, case_id=None: events.append(
+            (event_type, payload or {}, case_id)
+        ),
+    )
     monkeypatch.setattr(
         cases,
         "emit",
