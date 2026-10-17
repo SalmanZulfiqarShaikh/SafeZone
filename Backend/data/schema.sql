@@ -161,14 +161,107 @@ CREATE TABLE IF NOT EXISTS responder_links (
     expires_at TIMESTAMPTZ NOT NULL
 );
 
--- ─── 10. MOCK OUTBOX ─────────────────────────────────────────────────────────
--- Stores outbound messages when MOCK_MODE=1 or for message audit
-CREATE TABLE IF NOT EXISTS mock_outbox (
+-- ─── 10. OUTBOX ──────────────────────────────────────────────────────────────
+-- Every outbound message in both modes. This is the message audit log and the
+-- primary debugging surface when the demo misbehaves.
+-- Rename the old mock-only table first, so CREATE IF NOT EXISTS below does not
+-- create an empty replacement alongside it.
+DO $$
+BEGIN
+    IF to_regclass('public.mock_outbox') IS NOT NULL
+       AND to_regclass('public.outbox') IS NULL THEN
+        ALTER TABLE public.mock_outbox RENAME TO outbox;
+    END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS outbox (
     id BIGSERIAL PRIMARY KEY,
     to_phone TEXT NOT NULL,
     text TEXT NOT NULL,
     status TEXT DEFAULT 'sent',
+    mode TEXT NOT NULL DEFAULT 'mock',         -- 'mock' | 'live'
+    suppressed_reason TEXT,                    -- why send_message() did not send
     sent_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX IF NOT EXISTS idx_mock_outbox_phone ON mock_outbox(to_phone);
+-- Bring pre-existing outbox tables up to the current shape.
+ALTER TABLE outbox ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'mock';
+ALTER TABLE outbox ADD COLUMN IF NOT EXISTS suppressed_reason TEXT;
+
+DROP INDEX IF EXISTS idx_mock_outbox_phone;
+CREATE INDEX IF NOT EXISTS idx_outbox_phone ON outbox(to_phone);
+
+-- ─── 11. CONSTRAINT HARDENING ────────────────────────────────────────────────
+-- A typo in a status column otherwise writes an invalid value and the case
+-- silently stalls with no error. DO blocks keep this re-runnable.
+DO $$
+BEGIN
+    ALTER TABLE incidents ADD CONSTRAINT chk_incidents_status
+        CHECK (status IN ('open', 'active', 'resolved', 'closed'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE cases ADD CONSTRAINT chk_cases_status
+        CHECK (status IN ('proposed', 'approved', 'rejected', 'resolved'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE cases ADD CONSTRAINT chk_cases_dispatch_status
+        CHECK (dispatch_status IN (
+            'none', 'offered', 'accepted', 'on_way', 'arrived',
+            'confirmed', 'closed', 'reopened'
+        ));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE dispatches ADD CONSTRAINT chk_dispatches_status
+        CHECK (status IN (
+            'offered', 'accepted', 'on_way', 'arrived',
+            'done', 'declined', 'expired'
+        ));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE volunteers ADD CONSTRAINT chk_volunteers_status
+        CHECK (status IN ('off_duty', 'on_duty', 'busy'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+    ALTER TABLE outbox ADD CONSTRAINT chk_outbox_mode
+        CHECK (mode IN ('mock', 'live'));
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+-- Re-escalation must never offer the same case to the same volunteer twice.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_dispatches_case_volunteer
+    ON dispatches(case_id, volunteer_id);
+
+-- The queue sorts on this.
+CREATE INDEX IF NOT EXISTS idx_incidents_priority_score
+    ON incidents(priority_score DESC);
+
+-- ─── 12. ROW LEVEL SECURITY ──────────────────────────────────────────────────
+-- Supabase exposes every table over PostgREST, and the anon key ships in
+-- frontend code. RLS with zero policies blocks the anon key completely, while
+-- the backend's service key bypasses RLS. All access goes through FastAPI;
+-- nothing is read from the browser. Do not add policies without re-reading this.
+ALTER TABLE zones            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE people           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE incidents        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE reports          ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cases            ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events           ENABLE ROW LEVEL SECURITY;
+ALTER TABLE volunteers       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE dispatches       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE responder_links  ENABLE ROW LEVEL SECURITY;
+ALTER TABLE outbox           ENABLE ROW LEVEL SECURITY;

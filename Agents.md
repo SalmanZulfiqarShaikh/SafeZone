@@ -732,3 +732,77 @@ the honest labelling of simulated things.
 Commits follow `type(scope): description` — see CONTRIBUTING.md for types, scopes
 and examples. Branches are short-lived and merged the same day. Never commit a real
 phone number, `.env`, `*.db`, or build output.
+
+## 18. Who owns what
+
+Three people are building this. Before you write or modify a file, check this table.
+If a file is not owned by the person you are working with, do not edit it — say so and
+suggest they message the owner. Two agents editing the same file in parallel produces
+merge conflicts nobody has time to resolve.
+
+### Salman — the WhatsApp boundary and everything live
+
+| File | Responsibility |
+|---|---|
+| `services/whatsapp.py` | `send_message()` with all six guards, Meta Cloud API client, outbox writes |
+| `services/intake.py` | Command router, slot-filling conversation, direct-help flow |
+| `services/tools.py` | LLM tool schemas |
+| `routes/webhook.py` | `/webhook/whatsapp` — GET verify, POST inbound |
+| `main.py` | App setup, router registration, SPA mount |
+| `Frontend/src/pages/ControlRoom.tsx` | Map, ranked queue, case drawer, approve panel |
+| `Frontend/src/pages/Responder.tsx` | `/r/:token` handoff page |
+| — | Supabase projects, deployment, all secrets, Meta configuration |
+
+Salman holds the production keys. Nothing reaches production without him.
+
+### Hussain — the brain
+
+| File | Responsibility |
+|---|---|
+| `core/config.py` | Environment loading, constants, emergency numbers |
+| `core/phone.py` | `normalize_phone()`, `mask()`, `try_normalize()` |
+| `core/db.py` | Supabase client, error wrapping |
+| `services/risk.py` | Scoring, ranking, confidence, plain-language `reason` |
+| `services/protocol.py` + `data/protocol_graph.json` | Safety steps per category, graph traversal |
+| `services/extract.py` | `extract_report()` — the single LLM call on the report path |
+| `services/dispatch.py` | Nearest-first matching, offer rings, lifecycle transitions |
+| `services/silence.py` | Background loop: accept timeouts, re-escalation, silence detection |
+| `services/merge.py` | Duplicate report merging |
+| `services/hazards.py` | Weather and USGS feeds — first to cut if time runs short |
+
+`risk.py` is the file that answers the problem statement. The `reason` string must explain
+in plain language why one case outranks another. "The model said so" loses.
+
+### Abdul Rehman — self-contained pieces
+
+| File | Responsibility |
+|---|---|
+| `data/seed.py` | Seven Karachi zones with centroids, demo volunteers, sample incidents. Idempotent. Fake numbers only |
+| `core/events.py` | `emit()`, the event type enum, SSE fan-out |
+| `data/schema.sql` | RLS statements, CHECK constraints, indexes |
+| `routes/volunteers.py` | `GET /api/volunteers` |
+| `routes/responder.py` | `GET /api/r/{token}` — token lookup, expiry check, case summary JSON |
+| `routes/admin.py` | `POST /api/admin/killswitch` |
+| `Frontend/src/pages/Home.tsx` | Citizen page: heading, WhatsApp button, QR code |
+| `Frontend/src/pages/Volunteers.tsx` | Volunteer table with duty status, labelled as demo volunteers |
+
+Rehman's tickets are read-only endpoints, seed data and isolated pages. Nothing he owns
+touches the webhook or the dispatch timers.
+
+### Shared seams — agree the signature before building
+
+`services/dispatch.py` decides who to offer a case to; `services/whatsapp.py` sends it.
+Agree on `offer_case(case_id: int, ring: int) -> list[int]` before either side is written.
+
+`core/events.py` is imported by almost every module. It is the first thing to finish.
+
+### Build order
+
+Nothing proceeds until these three land, in order:
+
+1. Folder restructure committed — otherwise everyone writes imports twice
+2. Supabase dev and prod projects live with `schema.sql` and RLS applied
+3. `core/events.py` — `emit()` appears in the first line of almost every other module
+
+Then the vertical slice: `whatsapp.py` → `intake.py` → one report reaching the ranked
+queue. Prove that works before anything else is started.
