@@ -17,6 +17,7 @@ from routes.register import router as register_router
 from routes.responder import router as responder_router
 from routes.volunteers import router as volunteers_router
 from routes.webhook import router as webhook_router
+from routes.whatsapp import router as whatsapp_router
 from services import silence
 
 logger = logging.getLogger("safezone.main")
@@ -106,6 +107,7 @@ app.include_router(responder_router)
 app.include_router(register_router)
 app.include_router(admin_router)
 app.include_router(events_router)
+app.include_router(whatsapp_router)
 
 
 def mount_spa(app: FastAPI) -> None:

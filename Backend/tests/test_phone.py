@@ -85,3 +85,13 @@ def test_mask_keeps_only_last_four_digits():
     assert mask("03001234567").endswith("4567")
     assert mask("03001234567").count("*") == 7
     assert mask("") == "****"
+
+
+def test_format_display():
+    from core.phone import format_display
+
+    assert format_display("923492468494") == "+92 349 2468494"
+    assert format_display("03492468494") == "+92 349 2468494"
+    assert format_display("+92 349 2468494") == "+92 349 2468494"
+    assert format_display("invalid") == "invalid"
+    assert format_display(None) == ""
