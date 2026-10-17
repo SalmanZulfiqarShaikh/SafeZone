@@ -1,37 +1,62 @@
 import pytest
-from Backend.db import InMemoryDB, get_db
-from Backend.config import MOCK_MODE
+
+import core.db as db
+from core.db import DbError, execute, get_db
 
 
-def test_in_memory_db_crud():
-    db = InMemoryDB()
-
-    # Insert test
-    res = db.table("cases").insert({"category": "flood", "priority_score": 0.85, "reason": "Elderly alone on ground floor"}).execute()
-    assert len(res.data) == 1
-    assert res.data[0]["id"] == 1
-    assert res.data[0]["category"] == "flood"
-
-    # Select test
-    res_select = db.table("cases").select().eq("category", "flood").execute()
-    assert len(res_select.data) == 1
-    assert res_select.data[0]["priority_score"] == 0.85
-
-    # Update test
-    res_update = db.table("cases").update({"priority_score": 0.95}).eq("id", 1).execute()
-    assert len(res_update.data) == 1
-    assert res_update.data[0]["priority_score"] == 0.95
-
-    # Verify updated state
-    res_final = db.table("cases").select().eq("id", 1).execute()
-    assert res_final.data[0]["priority_score"] == 0.95
+@pytest.fixture(autouse=True)
+def reset_client(monkeypatch):
+    """Never reuse a cached client (and never touch the network) in tests."""
+    monkeypatch.setattr(db, "_supabase_client", None)
 
 
-def test_get_db_respects_mock_mode():
-    client = get_db()
-    assert client is not None
-    # Insert and select through get_db()
-    client.table("volunteers").insert({"name": "Ali", "phone": "923001234567"}).execute()
-    res = client.table("volunteers").select().eq("phone", "923001234567").execute()
-    assert len(res.data) == 1
-    assert res.data[0]["name"] == "Ali"
+def test_get_db_raises_without_credentials(monkeypatch):
+    monkeypatch.setattr(db, "SUPABASE_URL", "")
+    monkeypatch.setattr(db, "SUPABASE_SERVICE_KEY", "")
+
+    with pytest.raises(DbError, match="SUPABASE_URL"):
+        get_db()
+
+
+def test_get_db_raises_without_service_key(monkeypatch):
+    monkeypatch.setattr(db, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(db, "SUPABASE_SERVICE_KEY", "")
+
+    with pytest.raises(DbError, match="SUPABASE_SERVICE_KEY"):
+        get_db()
+
+
+def test_get_db_creates_and_caches_client(monkeypatch):
+    monkeypatch.setattr(db, "SUPABASE_URL", "https://example.supabase.co")
+    monkeypatch.setattr(db, "SUPABASE_SERVICE_KEY", "test-service-key")
+
+    calls = []
+
+    def fake_create_client(url, key):
+        calls.append((url, key))
+        return object()
+
+    monkeypatch.setattr(db, "_create_client", fake_create_client)
+
+    first = get_db()
+    second = get_db()
+
+    assert first is second
+    assert calls == [("https://example.supabase.co", "test-service-key")]
+
+
+def test_execute_wraps_client_errors():
+    class BrokenQuery:
+        def execute(self):
+            raise ValueError("boom")
+
+    with pytest.raises(DbError, match="boom"):
+        execute(BrokenQuery())
+
+
+def test_execute_returns_query_result():
+    class WorkingQuery:
+        def execute(self):
+            return "result"
+
+    assert execute(WorkingQuery()) == "result"
