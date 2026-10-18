@@ -41,6 +41,15 @@ SYSTEM_PROMPT = (
     "high, critical. Location is not known until an exact pin or address is "
     "given; a neighbourhood name alone is a zone_guess, not an exact location."
     "\n\n"
+    "The category decides which emergency service this case is handed to, so "
+    "when a report describes more than one thing, pick the one that needs the "
+    "most urgent service, in this order: fire, then medical, then structural, "
+    "then trapped, then flood. 'Water came into my house and my father is "
+    "unconscious' is medical, not flood -- the water is the context, the "
+    "unconscious man is the emergency. 'Our street is flooded' with nobody "
+    "hurt is flood. Put the parts you did not choose in needs, so the "
+    "coordinator still sees them."
+    "\n\n"
     "For zone_guess, return EXACTLY one id from the list below, or null if the "
     "person named no area you recognise. People write their own neighbourhood "
     "in many ways and often misspell it -- 'Gulistan-e-Jauhar', 'Gulistan e "
@@ -54,36 +63,80 @@ SYSTEM_PROMPT = (
 # a real id. 0.75 accepts "guilstan e jauhar" and rejects unrelated words.
 AREA_MATCH_CUTOFF = 0.75
 
-# Ordered: the first match wins, so specific hazards beat generic words.
+# Ordered: the first match wins. The order is a triage decision, not an
+# alphabetical one, because the category picks which emergency service the case
+# is handed to (data/protocol_graph.json -> emergency_kind).
+#
+# Monsoon reports are compound far more often than they are clean: "paani bhar
+# gaya aur abbu behosh hain" is a flood AND a man who needs an ambulance. The
+# first match decides, so the order has to rank the threat to a life above the
+# hazard that surrounds it:
+#
+#   fire        the only hazard that spreads by itself while you decide
+#   medical     a person dying now outranks the water they are standing in
+#   structural  a building coming down outranks being stuck inside it
+#   trapped     needs a rescue crew, and rescue is slower than an ambulance
+#   flood       the slowest-moving of the five; the default monsoon context
+#
+# flood sitting last is deliberate. It is the most common word in these
+# messages and the least specific about what anyone needs.
+#
+# Every branch carries its Roman Urdu terms, because this is the path that runs
+# when the LLM is down and people in Karachi do not write "fire". "aag lag gayi
+# hai" used to fall through to 'other', which routes to a relief organisation
+# -- so the one category that must surface the fire number first was the one
+# that lost it.
 CATEGORY_PATTERNS = (
-    ("fire", re.compile(r"\b(fire|smoke|burning|flames|blaze)\b", re.I)),
-    ("trapped", re.compile(r"\b(trapped|stuck|stranded|can'?t get out|cannot get out)\b", re.I)),
     (
-        "flood",
+        "fire",
         re.compile(
-            r"\b(flood|flooded|flooding|water (is )?rising|rain water|sewer|paani|pani)\b",
+            r"\b(fire|smoke|burning|flames|blaze|aag|dhuan|dhuaan|jal rah[ai])\b",
             re.I,
         ),
     ),
     (
         "medical",
         re.compile(
-            r"\b(medical|heart attack|cardiac|stroke|unconscious|bleeding|injured|"
-            r"injury|breathing|asthma|diabetic|pregnant|labour|labor)\b",
+            r"\b(medical|heart attack|cardiac|stroke|unconscious|behosh|bleeding|"
+            r"injured|injury|zakhmi|breathing|saans nahi|asthma|diabetic|pregnant|"
+            r"labour|labor)\b",
             re.I,
         ),
     ),
-    ("structural", re.compile(r"\b(collapse|collapsed|building damage|cracked|wall fell|roof fell)\b", re.I)),
+    (
+        "structural",
+        re.compile(
+            r"\b(collapse|collapsed|building damage|cracked|wall fell|roof fell|"
+            r"chat gir|deewar gir|gir gayi)\b",
+            re.I,
+        ),
+    ),
+    (
+        "trapped",
+        re.compile(
+            r"\b(trapped|stuck|stranded|can'?t get out|cannot get out|phans)",
+            re.I,
+        ),
+    ),
+    (
+        "flood",
+        re.compile(
+            r"\b(flood|flooded|flooding|water (is )?(rising|filled)|water has filled|"
+            r"rain water|sewer|paani|pani|barish|barsaat)\b",
+            re.I,
+        ),
+    ),
 )
 
 CRITICAL_PATTERNS = re.compile(
-    r"\b(not breathing|can'?t breathe|cannot breathe|unconscious|dying|"
-    r"cardiac arrest|no pulse|severe bleeding)\b",
+    r"\b(not breathing|can'?t breathe|cannot breathe|unconscious|behosh|"
+    r"saans nahi|dying|cardiac arrest|no pulse|severe bleeding)\b",
     re.I,
 )
 HIGH_PATTERNS = re.compile(
-    r"\b(urgent|trapped|stuck|bleeding|injured|baby|infant|child|children|"
-    r"elderly|disabled|wheelchair|pregnant|water (is )?rising|serious)\b",
+    r"\b(urgent|trapped|stuck|phans|bleeding|injured|zakhmi|baby|infant|child|"
+    r"children|bachay|elderly|disabled|wheelchair|pregnant|"
+    r"water (is )?rising|serious)\b",
     re.I,
 )
 LOW_PATTERNS = re.compile(r"\b(safe|no one hurt|nobody hurt|minor|not urgent)\b", re.I)

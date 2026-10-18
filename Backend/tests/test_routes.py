@@ -241,7 +241,9 @@ def test_reopen_refuses_cases_silence_will_not_open(world, monkeypatch):
 
 
 def test_responder_view_shows_first_name_and_call_number_only(world, monkeypatch):
-    monkeypatch.setattr(config, "EMERGENCY_AMBULANCE", "9100")
+    # _incident() is a flood, and flooding routes to the relief organisation,
+    # not the ambulance.
+    monkeypatch.setattr(config, "EMERGENCY_NGO", "9100")
     world["tables"]["incidents"].append(_incident())
     world["tables"]["people"].append(_person())
     world["tables"]["zones"].append({"id": "gulshan", "name": "Gulshan-e-Iqbal"})
@@ -264,12 +266,14 @@ def test_responder_view_shows_first_name_and_call_number_only(world, monkeypatch
     assert view["person"] == {"first_name": "Sara"}
     assert "phone" not in str(view)
     assert view["incident"]["report_count"] == 2
-    assert view["call"] == {"label": "Medical", "number": "9100"}
+    # A reader-facing label, not the internal key: "Ngo" is not a thing to put
+    # in front of someone deciding whether to call.
+    assert view["call"] == {"label": "Relief organisation", "number": "9100"}
     assert view["case"]["protocol_path"] == ["category:flood"]
 
 
 def test_missing_call_number_degrades_to_null(world, monkeypatch):
-    monkeypatch.setattr(config, "EMERGENCY_AMBULANCE", "")
+    monkeypatch.setattr(config, "EMERGENCY_NGO", "")
     world["tables"]["incidents"].append(_incident())
     world["tables"]["cases"].append(_case())
     world["tables"]["responder_links"].append(

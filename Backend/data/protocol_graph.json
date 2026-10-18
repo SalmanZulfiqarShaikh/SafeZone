@@ -3,7 +3,7 @@
   "categories": {
     "flood": {
       "label": "Flooding",
-      "emergency_kind": "medical",
+      "emergency_kind": "ngo",
       "official_first": false,
       "volunteer_eligible": true,
       "safety_steps": [
@@ -48,7 +48,7 @@
     },
     "trapped": {
       "label": "Trapped or stranded",
-      "emergency_kind": "medical",
+      "emergency_kind": "fire",
       "official_first": false,
       "volunteer_eligible": true,
       "safety_steps": [

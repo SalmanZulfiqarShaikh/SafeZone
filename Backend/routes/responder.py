@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException
 
 from core import config
 from routes import store
-from services import protocol
+from services import officials, protocol
 
 router = APIRouter(tags=["responder"])
 
@@ -54,6 +54,9 @@ def responder_view(token: str) -> Dict[str, Any]:
     category = (incident or {}).get("category") or "other"
     emergency_kind = protocol.node(category).get("emergency_kind", "ngo")
     call_number = config.get_emergency_number(emergency_kind)
+    # officials.SERVICE_LABELS, not emergency_kind.capitalize(): the raw kind is
+    # an internal key, so capitalising it put "Ngo" in front of a responder.
+    call_label = officials.SERVICE_LABELS.get(emergency_kind, "Emergency services")
 
     return {
         "token": token,
@@ -98,7 +101,7 @@ def responder_view(token: str) -> Dict[str, Any]:
             else None
         ),
         "call": {
-            "label": emergency_kind.capitalize(),
+            "label": call_label,
             "number": call_number,
         },
     }

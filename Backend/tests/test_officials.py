@@ -34,13 +34,28 @@ def numbers(monkeypatch):
         ("fire", "fire"),
         ("structural", "fire"),
         ("medical", "medical"),
-        ("trapped", "medical"),
-        ("flood", "medical"),
+        # Rescue, not a stretcher: someone stranded on a roof needs a crew
+        # that can reach them, and the ambulance cannot.
+        ("trapped", "fire"),
+        # Flooding is a relief job. This used to route to the ambulance, which
+        # meant "paani ghar me aa gaya" answered with an ambulance number --
+        # wrong service, and wrong enough that a real caller would waste the
+        # one call they had.
+        ("flood", "ngo"),
         ("other", "ngo"),
     ],
 )
 def test_categories_route_to_the_right_service(category, service):
     assert officials.service_for(category) == service
+
+
+def test_no_category_routes_a_waterlogging_report_to_an_ambulance():
+    """Guards the specific misroute, not just the table.
+
+    The table above can be edited to agree with a future bug. This asserts the
+    property that made the bug matter: water alone is never a medical call.
+    """
+    assert officials.service_for("flood") != "medical"
 
 
 def test_an_unknown_category_still_routes_somewhere():

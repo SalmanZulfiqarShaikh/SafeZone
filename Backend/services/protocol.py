@@ -77,11 +77,15 @@ def guidance_reply(category: str, shelter: Optional[str] = None) -> tuple[str, l
 
     number = get_emergency_number(n["emergency_kind"])
     if number:
+        # .get, not [...]: this is the instant reply, the one message that must
+        # go out even when everything else is broken. A category added later
+        # with an unknown emergency_kind should cost a vaguer label, not a
+        # KeyError on the only path that does not wait for anything.
         label = {
             "fire": "Fire service",
             "medical": "Ambulance",
             "ngo": "Relief organisation",
-        }[n["emergency_kind"]]
+        }.get(n["emergency_kind"], "Emergency services")
         # A demo number must never read as the real emergency service.
         note = config.emergency_number_note()
         if note:
