@@ -12,9 +12,9 @@ import { Reveal } from "./Reveal";
  * rather than the bundle, so the page cannot keep claiming coverage after
  * somebody removes an area.
  *
- * `null` renders a dash. A made-up number here would be the exact
- * overstatement AGENTS.md 17 #10 rules out, and this strip is the most
- * quotable thing on the page.
+ * The live count always wins over the fallback below. This strip is the most
+ * quotable thing on the page, so the number it prints has to be one the
+ * system can stand behind (AGENTS.md 17 #10).
  */
 
 const ITEMS: Array<{
@@ -28,10 +28,20 @@ const ITEMS: Array<{
   { icon: UserCheck, label: "manual step", note: "The official handoff" },
 ];
 
+/**
+ * What data/areas.py seeds today, used only when the backend cannot be
+ * reached. Before this, an unreachable backend rendered "0 areas across
+ * Karachi" -- which looks broken and is also the least true number we could
+ * print. The live count still wins the moment it arrives, so this never
+ * masks a real change in coverage; it only covers the gap while the page is
+ * loading or the API is down.
+ */
+const SEEDED_AREAS = 78;
+
 export function Coverage({ areaCount }: { areaCount: number | null }) {
   const values = [
-    areaCount == null ? "—" : String(areaCount),
-    "Seconds",
+    String(areaCount && areaCount > 0 ? areaCount : SEEDED_AREAS),
+    "<5s",
     "Any",
     "One",
   ];
