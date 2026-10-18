@@ -2,12 +2,167 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
 
 @custom-variant dark (&:is(.dark *));
 
+/* ───────────────────────────────────────────────────────────────────────────
+   SafeZone tokens — light operations theme.
+
+   Two colour axes, kept separate on purpose:
+
+     severity  — how urgent this is:  norm → elev → crit
+     element   — what kind of thing it is: water (flood), fire (heat/fire),
+                 earth (safe zones, shelters, resolved dispatches)
+
+   A flood nobody is hurt in reads blue-but-calm. A critical one reads crimson
+   whatever element it belongs to. One colour, one meaning — nothing here is
+   coloured to look nice.
+
+   WHY TWO TOKENS PER COLOUR. On a light canvas, amber (#D97706) hits 2.99:1
+   and green (#16A34A) hits 3.05:1 as text — both below AA. So each element
+   gets a FILL (pins, bars, pill backgrounds, where contrast is carried by
+   area) and a TEXT value one step darker, which clears 4.5:1. Use `-text`
+   for anything read as words.
+   ─────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Blue canvas, pale blue cards. Nothing here is pure white: the cards are
+     tinted too, and separate from the canvas by about two steps of lightness
+     rather than by being white against colour. */
+  --color-sz-base: #dce8f7;
+  --color-sz-panel: #f4f8fe;
+  --color-sz-raised: #e8f0fb;
+  --color-sz-line: #c6d7ee;
+  --color-sz-line-soft: #dce7f6;
+
+  --color-sz-text: #0f172a;
+  --color-sz-text-2: #44526a;
+  /* A step darker than slate-500 so it still clears 4.5:1 against the blue
+     canvas, not just against the white cards. */
+  --color-sz-text-3: #54616f;
+
+  /* The base token of each pair is the TEXT-SAFE value — ≥4.5:1 on the
+     canvas — because most uses are words, icons or thin strokes. It also
+     works as a solid fill under white text. */
+  --color-sz-crit: #dc2626;
+  --color-sz-elev: #b45309;
+  --color-sz-norm: #5b6878;
+  --color-sz-water: #2563eb;
+  --color-sz-earth: #15803d;
+  --color-sz-fire: #dc2626;
+  --color-sz-route: #0284c7;
+
+  /* `-fill` is the brief's lighter value, for areas large enough to carry
+     their own contrast: severity bars, map pins, capacity meters. Never for
+     text — amber at #D97706 is 2.99:1 and green at #16A34A is 3.05:1. */
+  --color-sz-crit-fill: #dc2626;
+  --color-sz-elev-fill: #d97706;
+  --color-sz-norm-fill: #94a3b8;
+  --color-sz-water-fill: #0284c7;
+  --color-sz-earth-fill: #16a34a;
+
+  /* On a solid fill of the matching colour. */
+  --color-sz-on-fill: #ffffff;
+
+  /* Deep navy chrome. The header and footer frame the work rather than being
+     another panel in it, which is why they are the darkest thing on screen
+     and the only place amber appears as a brand accent. Light blue workspace
+     inside a navy frame, amber for emphasis, red kept for the alarm. */
+  --color-sz-header: #1b4772;
+  --color-sz-header-line: #2d5e8f;
+  --color-sz-header-text: #eef5fc;
+  --color-sz-header-muted: #afc6de;
+  --color-sz-header-accent: #fbbf24;
+  --color-sz-header-safe: #6ee7b7;
+  /* Crimson is 3:1 on navy, so the header's critical count needs a lighter
+     red than the one used on the pale cards. */
+  --color-sz-crit-on-dark: #fca5a5;
+
+  /* The critical banner. Dark enough to carry white text at 8:1, so it reads
+     as an alarm rather than a tint. */
+  --color-sz-alert: #991b1b;
+  --color-sz-alert-line: #7f1d1d;
+
+  /* The basemap. Referenced as var() inside the SVG so the map follows the
+     theme without a second copy of the geography. */
+  --color-sz-map-land: #e3ecf8;
+  --color-sz-map-block: #d8e3f4;
+  --color-sz-map-sea: #bcd0ea;
+  --color-sz-map-coast: #9ab4d0;
+  /* Roads are the lightest thing on the map but still tinted — pure white
+     would be the only unmixed white left on screen. */
+  --color-sz-map-road: #f7fafe;
+  --color-sz-map-river: #aac6e2;
+
+  --color-sz-whatsapp: #15803d;
+
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono Variable", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-heading: "Geist Variable", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Dark operations theme, kept switchable rather than deleted: set
+   data-theme="dark" on <html>. Light is the default. */
+[data-theme="dark"] {
+  /* A soft dark, not a black. The surfaces sit around #1C2128–#2C333D so the
+     screen reads as dim paper rather than a void, which is what made the old
+     near-black version feel harsh.
+
+     The accents are deliberately desaturated — muted salmon, amber, sage and
+     steel rather than the 300-level brights. On a near-black ground those
+     brights glow; on this ground a calmer tone still clears 4.5:1 and stops
+     every status pill looking like neon. */
+  --color-sz-base: #252b33;
+  --color-sz-panel: #2d343d;
+  --color-sz-raised: #353d47;
+  --color-sz-line: #434c58;
+  --color-sz-line-soft: #39414b;
+
+  --color-sz-text: #e8eef5;
+  --color-sz-text-2: #aeb9c7;
+  --color-sz-text-3: #94a2b3;
+
+  --color-sz-crit: #e8827c;
+  --color-sz-elev: #d9a441;
+  --color-sz-norm: #8795a6;
+  --color-sz-water: #6fa8dc;
+  --color-sz-earth: #64b88b;
+  --color-sz-fire: #e0936a;
+  --color-sz-route: #6fa8dc;
+
+  --color-sz-crit-fill: #d9534c;
+  --color-sz-elev-fill: #c48a2e;
+  --color-sz-norm-fill: #6b7889;
+  --color-sz-water-fill: #5590c4;
+  --color-sz-earth-fill: #4f9e74;
+
+  --color-sz-crit-on-dark: #e8827c;
+
+  --color-sz-on-fill: #10161c;
+
+  /* Chrome stays a touch bluer than the surfaces so it still frames the work,
+     without dropping back to near-black. */
+  --color-sz-header: #2a3542;
+  --color-sz-header-line: #3d4958;
+  --color-sz-header-text: #e8eef5;
+  --color-sz-header-muted: #a6b3c2;
+  --color-sz-header-accent: #d9a441;
+  --color-sz-header-safe: #64b88b;
+
+  --color-sz-alert: #8a2b2b;
+  --color-sz-alert-line: #a13434;
+
+  --color-sz-map-land: #242a32;
+  --color-sz-map-block: #2b323b;
+  --color-sz-map-sea: #1e242b;
+  --color-sz-map-coast: #46525f;
+  --color-sz-map-road: #3d4753;
+  --color-sz-map-river: #2e3d4d;
+
+  --color-sz-whatsapp: #0e7a40;
+}
+
 @theme inline {
-    --font-heading: var(--font-sans);
-    --font-sans: 'Geist Variable', sans-serif;
     --color-sidebar-ring: var(--sidebar-ring);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,82 +204,219 @@
 }
 
 :root {
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --radius: 0.625rem;
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
+    --background: #f1f5f9;
+    --foreground: #0f172a;
+    --card: #ffffff;
+    --card-foreground: #0f172a;
+    --popover: #ffffff;
+    --popover-foreground: #0f172a;
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+    --secondary: #f1f5f9;
+    --secondary-foreground: #0f172a;
+    --muted: #f1f5f9;
+    --muted-foreground: #475569;
+    --accent: #f1f5f9;
+    --accent-foreground: #0f172a;
+    --destructive: #dc2626;
+    --border: #e2e8f0;
+    --input: #e2e8f0;
+    --ring: #2563eb;
+    --chart-1: #dc2626;
+    --chart-2: #d97706;
+    --chart-3: #2563eb;
+    --chart-4: #16a34a;
+    --chart-5: #64748b;
+    --radius: 0.25rem;
+    --sidebar: #ffffff;
+    --sidebar-foreground: #0f172a;
+    --sidebar-primary: #2563eb;
+    --sidebar-primary-foreground: #ffffff;
+    --sidebar-accent: #f1f5f9;
+    --sidebar-accent-foreground: #0f172a;
+    --sidebar-border: #e2e8f0;
+    --sidebar-ring: #2563eb;
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
+  }
   html {
     @apply font-sans;
-    }
+    background: var(--color-sz-base);
+    -webkit-text-size-adjust: 100%;
+    /* So flipping the theme fades rather than snaps. Suppressed under
+       prefers-reduced-motion by the block at the end of this file. */
+    transition: background-color 0.25s ease;
+  }
+  body {
+    @apply bg-sz-base text-sz-text;
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.45;
+  }
+  /* Digits must line up when you compare them down a column. */
+  .font-mono,
+  code,
+  kbd {
+    font-variant-numeric: tabular-nums;
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-sz-water);
+    outline-offset: 2px;
+  }
+
+  /* Tailwind v4's preflight sets `button { cursor: default }`, so every
+     control in the app would show an arrow rather than a hand. This restores
+     the pointer on everything actually clickable, as a floor under the
+     explicit `cursor-pointer` on individual components. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  label[for],
+  select:not(:disabled),
+  summary,
+  input[type="range"]:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  select:disabled {
+    cursor: not-allowed;
+  }
+}
+
+@layer utilities {
+  /* The provenance marker. Anything the system did not actually observe —
+     demo volunteers on team phones, seeded vehicles, a simulated SOS, an area
+     centre standing in for a pin — carries this hatch AND a word. Never the
+     hatch alone: pattern on its own is not readable to everyone, and
+     "simulated" is too important to encode in texture. */
+  .sz-hatch {
+    background-image: repeating-linear-gradient(
+      135deg,
+      currentColor 0 1.5px,
+      transparent 1.5px 5px
+    );
+  }
+
+  /* A faint measured grid, for the operations surfaces. No glow: this theme
+     is daylight-legible, not a HUD. */
+  .sz-grid {
+    background-image:
+      linear-gradient(to right, rgb(15 23 42 / 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(15 23 42 / 0.035) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  [data-theme="dark"] .sz-grid {
+    background-image:
+      linear-gradient(to right, rgb(232 238 245 / 0.035) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(232 238 245 / 0.035) 1px, transparent 1px);
+  }
+
+  /* A single soft lift for panels that sit above the canvas. One shadow,
+     used consistently, rather than a different elevation per component. */
+  .sz-lift {
+    box-shadow:
+      0 1px 2px rgb(15 23 42 / 0.04),
+      0 1px 3px rgb(15 23 42 / 0.06);
+  }
+
+  [data-theme="dark"] .sz-lift {
+    box-shadow: none;
+  }
+
+  /* One card, everywhere. Panels, meters and feed items all use this so the
+     surface language stays consistent instead of drifting per component. */
+  .sz-card {
+    border-radius: 0.625rem;
+    border: 1px solid var(--color-sz-line);
+    background: var(--color-sz-panel);
+    box-shadow:
+      0 1px 2px rgb(15 23 42 / 0.04),
+      0 1px 3px rgb(15 23 42 / 0.06);
+  }
+
+  [data-theme="dark"] .sz-card {
+    box-shadow: none;
+  }
+
+  .sz-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-sz-line) transparent;
+  }
+  .sz-scroll::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  .sz-scroll::-webkit-scrollbar-thumb {
+    background: var(--color-sz-line);
+    border-radius: 99px;
+  }
+  .sz-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+}
+
+/* Only critical pins pulse. Motion is information here: if everything moved,
+   movement would mean nothing. */
+@keyframes sz-ping {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.5;
+  }
+  70%,
+  100% {
+    transform: scale(2.3);
+    opacity: 0;
+  }
+}
+
+.sz-ping {
+  animation: sz-ping 2.1s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+/* Dispatch lines: the dash marches from the volunteer towards the case, so
+   direction of travel is readable without an arrowhead. */
+@keyframes sz-march {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+.sz-march {
+  animation: sz-march 0.9s linear infinite;
+}
+
+/* The stage currently in progress on a lifecycle rail. */
+@keyframes sz-stage {
+  0%,
+  100% {
+    opacity: 0.5;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.sz-stage-active {
+  animation: sz-stage 1.3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sz-ping,
+  .sz-march,
+  .sz-stage-active {
+    animation: none;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

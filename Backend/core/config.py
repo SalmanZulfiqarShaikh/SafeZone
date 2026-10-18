@@ -99,6 +99,22 @@ GLOBAL_MESSAGE_CAP: int = _get_int("GLOBAL_MESSAGE_CAP", 500)
 PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
 RESPONDER_LINK_TTL_HOURS: int = _get_int("RESPONDER_LINK_TTL_HOURS", 24)
 
+# ─── Control-room login ────────────────────────────────────────────────────
+# The coordinator surfaces show reporter names, numbers and exact locations,
+# so they are not public. These three are empty here on purpose: the
+# repository is public (AGENTS.md 12), and a password or a signing secret in
+# a committed file is the same mistake as a real phone number.
+#
+# ADMIN_PASSWORD_HASH is a PBKDF2 hash, never the password itself. Generate
+# it with:  python -m scripts.hash_password
+#
+# With any of the three empty the server refuses every login rather than
+# falling open, and says so plainly at startup.
+ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "").strip()
+ADMIN_PASSWORD_HASH: str = os.getenv("ADMIN_PASSWORD_HASH", "").strip()
+SESSION_SECRET: str = os.getenv("SESSION_SECRET", "").strip()
+SESSION_TTL_HOURS: int = _get_int("SESSION_TTL_HOURS", 12)
+
 # Per-number rate limiting, enforced inside send_message().
 PER_NUMBER_RATE_LIMIT: int = _get_int("PER_NUMBER_RATE_LIMIT", 10)
 PER_NUMBER_RATE_WINDOW_S: int = _get_int("PER_NUMBER_RATE_WINDOW_S", 300)
@@ -122,7 +138,11 @@ if _raw_demo_volunteers:
 # source. When missing, guidance degrades rather than crashing the first reply.
 EMERGENCY_FIRE: str = os.getenv("EMERGENCY_FIRE", "").strip()
 EMERGENCY_AMBULANCE: str = os.getenv("EMERGENCY_AMBULANCE", "").strip()
-EMERGENCY_POLICE: str = os.getenv("EMERGENCY_POLICE", "").strip()
+# Food, water and anything we could not classify go to a relief
+# organisation, not to the police. Someone who cannot classify their own
+# emergency is usually not reporting a crime, and sending them to a police
+# line wastes the one message they had the composure to send.
+EMERGENCY_NGO: str = os.getenv("EMERGENCY_NGO", "").strip()
 
 # Whether outbound messages carry an in-message "this is a demo" caveat.
 #
@@ -153,11 +173,15 @@ COORDINATOR_NUMBERS: List[str] = [
 ]
 COORDINATOR_NOTIFY: bool = _get_bool("COORDINATOR_NOTIFY", True)
 
-# Channel used when a coordinator approves by text ("APPROVE 14"). "both"
-# offers nearby volunteers AND sends the official handoff, which is what a
-# coordinator with only a phone almost always wants.
+# Channel used when a coordinator approves by text ("APPROVE 14").
+#
+# "responder" -- the official handoff -- because nearby volunteers were
+# already offered the case the moment it arrived (services/intake). Approval
+# is now about the expensive, irreversible half: putting an ambulance, a fire
+# crew or the police on the road. Set "both" to also re-offer volunteers,
+# which is useful when the first ring all declined.
 COORDINATOR_DEFAULT_CHANNEL: str = os.getenv(
-    "COORDINATOR_DEFAULT_CHANNEL", "both"
+    "COORDINATOR_DEFAULT_CHANNEL", "responder"
 ).strip().lower()
 
 SIMULATED_NUMBER_NOTE = "(demo number, not the real emergency service)"
@@ -187,7 +211,7 @@ def get_emergency_number(category: str) -> Optional[str]:
     elif cat in ("medical", "trapped", "flood"):
         number, setting = EMERGENCY_AMBULANCE, "EMERGENCY_AMBULANCE"
     else:
-        number, setting = EMERGENCY_POLICE, "EMERGENCY_POLICE"
+        number, setting = EMERGENCY_NGO, "EMERGENCY_NGO"
 
     if not number:
         logger.error(
@@ -261,11 +285,14 @@ def startup_report() -> List[str]:
             "EMERGENCY_AMBULANCE is not set — medical, trapped and flood guidance "
             "will omit the official number."
         )
-    if not EMERGENCY_POLICE:
-        problems.append("EMERGENCY_POLICE is not set — other guidance will omit the official number.")
+    if not EMERGENCY_NGO:
+        problems.append(
+            "EMERGENCY_NGO is not set — food, water and unclassified guidance "
+            "will omit the relief contact."
+        )
 
     if not ALLOWLIST_ONLY and not SHOW_SIMULATION_LABELS and (
-        EMERGENCY_FIRE or EMERGENCY_AMBULANCE or EMERGENCY_POLICE
+        EMERGENCY_FIRE or EMERGENCY_AMBULANCE or EMERGENCY_NGO
     ):
         problems.append(
             "ALLOWLIST_ONLY is off and SHOW_SIMULATION_LABELS is off — anyone "

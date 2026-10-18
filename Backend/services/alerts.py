@@ -136,8 +136,12 @@ def compose(category: str, zone_id: str) -> str:
 
     number = config.get_emergency_number(category)
     if number:
-        service = protocol.node(category).get("emergency_kind", "police")
-        service_label = {"fire": "Fire service", "medical": "Ambulance", "police": "Police"}.get(
+        service = protocol.node(category).get("emergency_kind", "ngo")
+        service_label = {
+            "fire": "Fire service",
+            "medical": "Ambulance",
+            "ngo": "Relief organisation",
+        }.get(
             service, "Emergency services"
         )
         lines.append(f"{service_label}: {number}{config.emergency_number_note()}")

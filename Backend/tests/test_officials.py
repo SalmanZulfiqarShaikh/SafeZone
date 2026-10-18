@@ -21,7 +21,7 @@ def numbers(monkeypatch):
     """Obviously fake numbers. Never a real emergency number in a test."""
     monkeypatch.setattr(config, "EMERGENCY_FIRE", "1000000")
     monkeypatch.setattr(config, "EMERGENCY_AMBULANCE", "2000000")
-    monkeypatch.setattr(config, "EMERGENCY_POLICE", "3000000")
+    monkeypatch.setattr(config, "EMERGENCY_NGO", "3000000")
 
 
 # ─── Routing ───────────────────────────────────────────────────────────────
@@ -35,7 +35,7 @@ def numbers(monkeypatch):
         ("medical", "medical"),
         ("trapped", "medical"),
         ("flood", "medical"),
-        ("other", "police"),
+        ("other", "ngo"),
     ],
 )
 def test_categories_route_to_the_right_service(category, service):
@@ -44,7 +44,7 @@ def test_categories_route_to_the_right_service(category, service):
 
 def test_an_unknown_category_still_routes_somewhere():
     """A typo must not leave a case with no official target at all."""
-    assert officials.service_for("banana") in ("fire", "medical", "police")
+    assert officials.service_for("banana") in ("fire", "medical", "ngo")
 
 
 @pytest.mark.parametrize("category", ["fire", "medical"])

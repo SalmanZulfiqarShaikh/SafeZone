@@ -38,11 +38,26 @@ ACTIVE_DISPATCH_STATUSES = ("offered", "accepted", "on_way", "arrived")
 RING_SIZE = config.VOLUNTEER_OFFER_RING_SIZE
 
 
+# A case may be offered to neighbours while it is still proposed: volunteers
+# are *asked*, not dispatched, and waiting for a coordinator to wake up costs
+# the minutes that decide most outcomes. What a volunteer receives carries an
+# area and a one-line summary -- no name, no number, no exact pin -- and any
+# of them can decline.
+#
+# A finished case is a different matter: once it is resolved or rejected,
+# offering it again would send someone to an emergency that is over.
+UNOFFERABLE_STATUSES = ("resolved", "rejected")
+
+
 def offer_case(case_id: int, ring: int = 1) -> List[int]:
-    """Offer an approved case to the next ring of volunteers.
+    """Offer a live case to the next ring of volunteers.
 
     Returns the volunteer ids that were offered it. Empty when the case cannot
     be dispatched (unknown location, structural damage, nobody available).
+
+    The official handoff is the step that still waits for a human
+    (``services/approval``). Sending an ambulance to a misread message spends
+    a vehicle the city has few of; asking a neighbour to look does not.
     """
     context = _case_context(case_id)
     if context is None:
@@ -50,8 +65,9 @@ def offer_case(case_id: int, ring: int = 1) -> List[int]:
 
     case, incident, zone = context["case"], context["incident"], context["zone"]
 
-    if case.get("status") != "approved":
-        logger.warning("Case %s is not approved; refusing to offer it", case_id)
+    status = case.get("status")
+    if status in UNOFFERABLE_STATUSES:
+        logger.warning("Case %s is %s; refusing to offer it", case_id, status)
         return []
 
     # AGENTS.md 9 bars dispatching a case with no location at all. An area the

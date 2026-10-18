@@ -11,8 +11,8 @@ Run from ``Backend/``::
 
 What it does NOT touch: the schema itself. Only rows.
 
-Zones are deleted and re-seeded from ``data/areas.py``, so the 50 areas and
-the volunteer split come back exactly as configured. Volunteers are rebuilt
+Zones are deleted and re-seeded from ``data/areas.py``, so every area and the
+district-by-district volunteer split come back exactly as configured. Volunteers are rebuilt
 from ``DEMO_VOLUNTEERS``, so changing who covers which half is an .env edit
 followed by this script.
 """

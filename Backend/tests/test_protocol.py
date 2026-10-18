@@ -11,7 +11,7 @@ def configured_numbers(monkeypatch):
     monkeypatch.setattr(protocol, "get_emergency_number", lambda kind: {
         "fire": "16001",
         "medical": "1122",
-        "police": "15",
+        "ngo": "15",
     }[kind])
 
 
@@ -43,7 +43,10 @@ def test_official_first_categories_lead_with_the_number(category):
 def test_other_categories_still_show_the_number(category):
     text, _path = protocol.guidance_reply(category)
 
-    assert any(line.startswith(("Ambulance:", "Police:", "Fire service:")) for line in text.splitlines())
+    assert any(
+        line.startswith(("Ambulance:", "Fire service:", "Relief organisation:"))
+        for line in text.splitlines()
+    )
 
 
 def test_missing_emergency_number_degrades_instead_of_crashing(monkeypatch):

@@ -84,7 +84,17 @@ def test_startup_warns_when_nobody_would_be_told(monkeypatch):
 def test_the_alert_leads_with_the_case_and_the_ask():
     text = coordinator.compose(case_id=6, category="flood", priority_score=0.4)
 
-    assert text.splitlines()[0] == "SafeZone: case 6 needs approval"
+    assert text.splitlines()[0] == "SafeZone: case 6 needs a handoff decision"
+
+
+def test_the_alert_says_volunteers_already_have_it():
+    """The distinction that matters at 3am. "Needs approval" on its own reads
+    as "nobody has moved yet", which is no longer true: the neighbours were
+    offered it on arrival. What is waiting is the official handoff."""
+    text = coordinator.compose(case_id=6, category="flood", priority_score=0.4)
+
+    assert "already been offered" in text
+    assert "official service" in text
 
 
 def test_the_alert_carries_enough_to_triage_without_opening_anything():
@@ -174,7 +184,7 @@ def test_reporting_an_emergency_alerts_the_coordinator(world):
 
     to_coordinator = [t for to, t in world["sent"] if to == "923009999999"]
     assert to_coordinator
-    assert "needs approval" in to_coordinator[0]
+    assert "needs a handoff decision" in to_coordinator[0]
     assert "Gulshan-e-Iqbal" in to_coordinator[0]
 
 
@@ -193,3 +203,79 @@ def test_a_greeting_alerts_nobody(world):
     intake.handle_inbound("923001234567", "hi")
 
     assert [t for to, t in world["sent"] if to == "923009999999"] == []
+
+
+# ─── Who hears about a case, and when ──────────────────────────────────────
+
+
+def _on_duty_volunteer(db, phone="923007777777"):
+    db.tables["volunteers"].append(
+        {
+            "id": 70,
+            "name": "Demo volunteer A",
+            "phone": phone,
+            "zone_ids": ["gulshan"],
+            "capabilities": ["foot"],
+            "lat": 24.9201,
+            "lng": 67.0901,
+            "status": "on_duty",
+            "is_demo": True,
+        }
+    )
+    return phone
+
+
+def test_a_volunteer_hears_about_it_without_waiting_for_approval(world, monkeypatch):
+    """The whole point of the split.
+
+    Neighbours are *offered* a case on arrival -- they can decline, and the
+    message carries no name and no number. Making them wait for a coordinator
+    to wake up costs the minutes that decide most outcomes.
+    """
+    monkeypatch.setattr(config, "EMERGENCY_AMBULANCE", "923000000001")
+    world["db"].tables["zones"][0].update({"lat": 24.92, "lng": 67.09})
+    phone = _on_duty_volunteer(world["db"])
+
+    intake.handle_inbound("923001234567", "water is rising in my house in Gulshan")
+
+    assert any(to == phone for to, _text in world["sent"]), (
+        "the nearest volunteer was not offered the case on arrival"
+    )
+
+
+def test_the_case_is_still_proposed_while_volunteers_are_looking(world):
+    """Offering is not approving. The official handoff -- the expensive,
+    irreversible half -- is still waiting for a human."""
+    world["db"].tables["zones"][0].update({"lat": 24.92, "lng": 67.09})
+    _on_duty_volunteer(world["db"])
+
+    intake.handle_inbound("923001234567", "water is rising in my house in Gulshan")
+
+    assert world["tables"]["cases"][0]["status"] == "proposed"
+
+
+def test_the_official_service_is_not_told_before_approval(world, monkeypatch):
+    """A misread message that reaches a neighbour costs a walk. One that
+    reaches an ambulance spends a vehicle the city has few of."""
+    monkeypatch.setattr(config, "EMERGENCY_AMBULANCE", "923000000099")
+    monkeypatch.setattr(config, "EMERGENCY_FIRE", "923000000099")
+    monkeypatch.setattr(config, "EMERGENCY_NGO", "923000000099")
+    world["db"].tables["zones"][0].update({"lat": 24.92, "lng": 67.09})
+    _on_duty_volunteer(world["db"])
+
+    intake.handle_inbound("923001234567", "water is rising in my house in Gulshan")
+
+    handoffs = [t for to, t in world["sent"] if to == "923000000099"]
+    assert not handoffs, "the official service was told before anyone approved"
+
+
+def test_a_volunteer_offer_never_carries_the_reporter_s_number(world):
+    """AGENTS.md 9: contact details are released once, to whoever accepts."""
+    world["db"].tables["zones"][0].update({"lat": 24.92, "lng": 67.09})
+    phone = _on_duty_volunteer(world["db"])
+
+    intake.handle_inbound("923001234567", "water is rising in my house in Gulshan")
+
+    offers = [t for to, t in world["sent"] if to == phone]
+    assert offers
+    assert "923001234567" not in offers[0]

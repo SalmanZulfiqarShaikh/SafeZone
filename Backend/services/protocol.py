@@ -77,7 +77,11 @@ def guidance_reply(category: str, shelter: Optional[str] = None) -> tuple[str, l
 
     number = get_emergency_number(n["emergency_kind"])
     if number:
-        label = {"fire": "Fire service", "medical": "Ambulance", "police": "Police"}[n["emergency_kind"]]
+        label = {
+            "fire": "Fire service",
+            "medical": "Ambulance",
+            "ngo": "Relief organisation",
+        }[n["emergency_kind"]]
         # A demo number must never read as the real emergency service.
         note = config.emergency_number_note()
         if note:

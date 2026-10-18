@@ -765,7 +765,17 @@ def _handle_help_request(
         priority_score,
     )
 
-    # Nothing dispatches until a human approves, so tell them it is waiting.
+    # Volunteers are asked straight away. They are neighbours being *offered*
+    # a case, not a crew being dispatched: the message carries an area and a
+    # one-line summary, no name and no number, and anyone can decline. Making
+    # them wait for a coordinator to wake up costs the minutes that decide
+    # most outcomes, and the coordinator is being alerted in the same breath.
+    #
+    # The official handoff is the part that still waits for a human. Sending
+    # an ambulance to a misread message spends a vehicle the city has few of,
+    # so services/approval keeps that behind approval.
+    _offer_to_volunteers(case_id)
+
     _alert_coordinators(
         case_id=case_id,
         category=category,
@@ -897,6 +907,29 @@ def _known_zone(zone_guess: Any) -> Optional[str]:
         zone_id,
     )
     return None
+
+
+def _offer_to_volunteers(case_id: Any) -> None:
+    """Offer a brand-new case to the nearest on-duty volunteers.
+
+    Never fatal. A case nobody can be offered -- no location, nobody on duty,
+    not volunteer-eligible -- is still a case: the coordinator alert goes out
+    regardless and the official handoff is unaffected.
+    """
+    try:
+        offered = dispatch.offer_case(case_id, ring=1)
+    except Exception:  # noqa: BLE001 - an offer must not cost us the case
+        logger.exception("Could not offer case %s to volunteers", case_id)
+        return
+
+    if offered:
+        logger.info("Case %s offered to %d volunteer(s) on arrival", case_id, len(offered))
+    else:
+        logger.info(
+            "Case %s could not be offered to anyone yet (no location, nobody on "
+            "duty, or not volunteer-eligible)",
+            case_id,
+        )
 
 
 def _alert_coordinators(*, zone_id: Optional[str] = None, **fields: Any) -> None:

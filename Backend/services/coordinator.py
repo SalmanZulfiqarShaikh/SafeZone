@@ -105,7 +105,7 @@ def compose(
     label = (category or "emergency").replace("_", " ").capitalize()
     where = f" near {area}" if area else ""
 
-    lines = [f"SafeZone: case {case_id} needs approval", "", f"{label}{where}."]
+    lines = [f"SafeZone: case {case_id} needs a handoff decision", "", f"{label}{where}."]
 
     if vuln_summary:
         lines.append(f"Who: {vuln_summary}.")
@@ -130,7 +130,11 @@ def compose(
         pass
 
     lines.append("")
-    lines.append(f"Reply APPROVE {case_id} to send it out, or REJECT {case_id}.")
+    # The distinction that matters at 3am: the neighbours already know, so
+    # this is not "nobody has moved yet". What is waiting is the official
+    # handoff, which is the expensive, irreversible half.
+    lines.append("Nearby volunteers have already been offered this.")
+    lines.append(f"Reply APPROVE {case_id} to send it to the official service, or REJECT {case_id}.")
     if config.PUBLIC_BASE_URL:
         lines.append(f"Control room: {config.PUBLIC_BASE_URL}/control")
 

@@ -3,7 +3,7 @@ import logging
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -11,12 +11,15 @@ from core import config, events
 from core.db import get_db
 from core.phone import mask
 from routes.admin import router as admin_router
+from routes.auth import require_admin, router as auth_router
 from routes.cases import router as cases_router
 from routes.events import router as events_router
 from routes.register import router as register_router
 from routes.responder import router as responder_router
 from routes.volunteers import router as volunteers_router
 from routes.webhook import router as webhook_router
+from routes.whatsapp_public import router as whatsapp_router
+from routes.zones import router as zones_router
 from services import silence
 
 logger = logging.getLogger("safezone.main")
@@ -74,6 +77,29 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("ALLOWLIST_ONLY is off — any number can receive messages.")
 
+    # The control room is unreachable without a login, so a half-configured
+    # one is a demo that cannot start rather than a quiet security hole. Say
+    # which part is missing, at startup, not at the first 401.
+    from core import auth as _auth
+
+    if _auth.is_configured():
+        logger.info("Control room login is on for %s.", config.ADMIN_EMAIL)
+    else:
+        missing = [
+            name
+            for name, value in (
+                ("ADMIN_EMAIL", config.ADMIN_EMAIL),
+                ("ADMIN_PASSWORD_HASH", config.ADMIN_PASSWORD_HASH),
+                ("SESSION_SECRET", config.SESSION_SECRET),
+            )
+            if not value.strip()
+        ]
+        logger.warning(
+            "Control room login is NOT configured (%s missing), so /control and "
+            "/volunteers will refuse every sign-in. Run: python -m scripts.hash_password",
+            ", ".join(missing),
+        )
+
     # emit() may run in worker threads; capture the loop for SSE fan-out.
     events.set_loop(asyncio.get_running_loop())
     # Fail loudly here rather than silently switching data layers later.
@@ -99,13 +125,31 @@ def hello():
 
 # API routers FIRST — mounts and the SPA catch-all are greedy. Anything
 # registered after mount_spa() is silently dead.
+# Public by design, and each one says why:
+#   webhook   -- Meta calls it; it verifies an X-Hub-Signature-256 instead.
+#   responder -- the link IS the credential, and it goes to a fire or
+#                ambulance desk that will never have a SafeZone login.
+#   register  -- the whole point is that anyone can ask for area alerts.
+#   auth      -- you cannot require a session to create one.
+#   zones     -- the public registration form needs the area list.
+#   whatsapp  -- the number on the poster; the public page shows it.
 app.include_router(webhook_router)
-app.include_router(cases_router)
-app.include_router(volunteers_router)
 app.include_router(responder_router)
 app.include_router(register_router)
-app.include_router(admin_router)
-app.include_router(events_router)
+app.include_router(auth_router)
+app.include_router(zones_router)
+app.include_router(whatsapp_router)
+
+# Behind the login. These carry reporter names, numbers and exact locations
+# (AGENTS.md 9), who is on duty and where, and the switch that stops every
+# outbound message. The guard goes on at mount time rather than on each
+# function, so a route added later is protected by default instead of by
+# whoever remembers the decorator.
+PROTECTED = [Depends(require_admin)]
+app.include_router(cases_router, dependencies=PROTECTED)
+app.include_router(volunteers_router, dependencies=PROTECTED)
+app.include_router(admin_router, dependencies=PROTECTED)
+app.include_router(events_router, dependencies=PROTECTED)
 
 
 def mount_spa(app: FastAPI) -> None:

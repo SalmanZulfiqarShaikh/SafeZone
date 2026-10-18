@@ -78,7 +78,7 @@
     },
     "other": {
       "label": "Emergency",
-      "emergency_kind": "police",
+      "emergency_kind": "ngo",
       "official_first": false,
       "volunteer_eligible": true,
       "safety_steps": [

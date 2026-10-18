@@ -117,13 +117,38 @@ def test_offer_skips_busy_volunteers_and_previous_offers(world):
     assert offered == [3]
 
 
-def test_offer_requires_approved_case_and_known_location(world):
+def test_a_proposed_case_is_offered_without_waiting_for_approval(world):
+    """Volunteers are asked the moment a case arrives.
+
+    They are neighbours being offered a case, not a crew being dispatched --
+    the message carries an area and a summary, never a name or a number, and
+    anyone can decline. Waiting for a coordinator to wake up costs the
+    minutes that decide most outcomes. The official handoff is the step that
+    still waits for a human.
+    """
     _case(world["db"], status="proposed")
     _volunteer(world["db"], 1, "923000000001", 24.9201, 67.0901)
-    assert dispatch.offer_case(1) == []
 
-    world["tables"]["cases"][0]["status"] = "approved"
+    assert dispatch.offer_case(1) == [1]
+
+
+@pytest.mark.parametrize("status", ["resolved", "rejected"])
+def test_a_finished_case_is_never_offered(world, status):
+    """The other half of the rule. Offering a resolved or rejected case
+    would send a neighbour to an emergency that is over."""
+    _case(world["db"], status=status)
+    _volunteer(world["db"], 1, "923000000001", 24.9201, 67.0901)
+
+    assert dispatch.offer_case(1) == []
+    assert world["tables"]["dispatches"] == []
+
+
+def test_offer_requires_a_known_location(world):
+    _case(world["db"], status="proposed")
+    _volunteer(world["db"], 1, "923000000001", 24.9201, 67.0901)
     world["tables"]["incidents"][0]["location_known"] = False
+    world["tables"]["incidents"][0]["location_source"] = None
+
     assert dispatch.offer_case(1) == []
 
 

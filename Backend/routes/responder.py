@@ -52,7 +52,7 @@ def responder_view(token: str) -> Dict[str, Any]:
     )
 
     category = (incident or {}).get("category") or "other"
-    emergency_kind = protocol.node(category).get("emergency_kind", "police")
+    emergency_kind = protocol.node(category).get("emergency_kind", "ngo")
     call_number = config.get_emergency_number(emergency_kind)
 
     return {

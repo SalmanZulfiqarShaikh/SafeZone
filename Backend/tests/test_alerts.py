@@ -30,7 +30,7 @@ def db(monkeypatch):
     monkeypatch.setattr(config, "ZONE_ALERT_MAX_RECIPIENTS", 50)
     monkeypatch.setattr(config, "EMERGENCY_FIRE", "1000000")
     monkeypatch.setattr(config, "EMERGENCY_AMBULANCE", "2000000")
-    monkeypatch.setattr(config, "EMERGENCY_POLICE", "3000000")
+    monkeypatch.setattr(config, "EMERGENCY_NGO", "3000000")
 
     store.sent = sent
     return store

@@ -61,7 +61,7 @@ def world(monkeypatch):
     monkeypatch.setattr(config, "COORDINATOR_DEFAULT_CHANNEL", "both")
     monkeypatch.setattr(config, "EMERGENCY_AMBULANCE", "923000000001")
     monkeypatch.setattr(config, "EMERGENCY_FIRE", "923000000001")
-    monkeypatch.setattr(config, "EMERGENCY_POLICE", "923000000001")
+    monkeypatch.setattr(config, "EMERGENCY_NGO", "923000000001")
 
     db.tables["zones"].append(
         {"id": "gulshan", "name": "Gulshan-e-Iqbal", "lat": 24.92, "lng": 67.09}

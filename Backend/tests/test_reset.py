@@ -13,6 +13,7 @@ problem only shows up when a volunteer never gets offered the case.
 import pytest
 
 from core import config
+from data import areas
 from data import seed as seed_module
 from scripts import reset_demo
 from tests.fake_db import FakeDB
@@ -128,4 +129,7 @@ def test_samples_are_seeded_by_default(db):
 def test_zones_come_back_after_a_wipe(db):
     reset_demo.main(["--yes", "--no-samples"])
 
-    assert len(db.tables["zones"]) == 50
+    # Counted from the area list itself: the list grows as districts are
+    # filled in, and a hard-coded number here would go stale and fail on an
+    # edit that is perfectly correct.
+    assert len(db.tables["zones"]) == len(areas.AREAS)

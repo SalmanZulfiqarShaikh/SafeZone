@@ -36,7 +36,7 @@ logger = logging.getLogger("safezone.officials")
 SERVICE_LABELS = {
     "fire": "Fire service",
     "medical": "Ambulance",
-    "police": "Police",
+    "ngo": "Relief organisation",
 }
 
 # The honesty stamp. It goes in the responder link's target label, so it shows
@@ -50,7 +50,7 @@ def service_for(category: str) -> str:
     Reuses the protocol graph rather than keeping a second mapping, so adding
     a category in one place cannot silently misroute it here.
     """
-    return protocol.node(category).get("emergency_kind", "police")
+    return protocol.node(category).get("emergency_kind", "ngo")
 
 
 def requires_official(category: str) -> bool:
