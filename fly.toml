@@ -1,0 +1,53 @@
+# SafeZone on Fly.
+#
+# ─── Set primary_region to wherever Supabase is ──────────────────────────────
+# This is the single most important line in the file. Every database call is a
+# round trip, and from a laptop in Karachi to Supabase that is roughly 400ms --
+# which is why the control room took seconds to load in development. Put the
+# app next to the database and the same call costs about 15ms.
+#
+# Find it: Supabase dashboard → Project Settings → General → Region.
+# Then pick the matching Fly region:
+#
+# This project's Supabase lives in ap-southeast-2, which is Sydney, so the app
+# goes in syd.
+#
+# Singapore is physically closer to Karachi and looks tempting, but it is the
+# wrong trade. One page load makes a handful of API calls and each of those
+# makes several database calls, so the hop that gets multiplied is app-to-
+# database, not browser-to-app:
+#
+#   app in syd:  ~200ms browser hop once + ~15ms per query   -> ~230ms
+#   app in sin:  ~100ms browser hop once + ~95ms per query   -> ~290ms and up
+#
+# Co-locate with the database. The browser pays its distance once; the database
+# is paid for on every query.
+
+app = "safezone"
+primary_region = "syd"
+
+[build]
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+  # Do not let the machine sleep. A stopped machine has to boot before it can
+  # answer, and the request that wakes it may be Meta delivering someone's
+  # emergency message -- Meta does not wait politely. The cost of one small
+  # machine running continuously is not worth that risk.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [http_service.concurrency]
+    type = "requests"
+    # Each open control-room tab holds one connection for the SSE stream and
+    # never gives it back, so the ceiling has to leave room for those on top of
+    # ordinary traffic.
+    soft_limit = 50
+    hard_limit = 100
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"

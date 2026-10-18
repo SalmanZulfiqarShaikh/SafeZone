@@ -1,0 +1,24 @@
+# Secrets never enter the image. Fly holds them as secrets and injects them as
+# environment variables at runtime.
+.env
+.env.*
+*.env
+cookies.txt
+body.json
+
+.git
+.github
+.claude
+.venv
+**/__pycache__/
+**/*.py[cod]
+**/.pytest_cache/
+**/node_modules/
+**/dist/
+
+# Rebuilt inside the image by the frontend stage.
+Backend/static/
+
+*.exe
+*.log
+*.md
