@@ -75,3 +75,6 @@ cloudflared.exe
 
 # Local agent tool permissions. Machine-specific, not shared config.
 .claude/settings.local.json
+
+cookies.txt
+body.json
