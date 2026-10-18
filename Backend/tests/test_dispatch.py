@@ -1,6 +1,6 @@
 import pytest
 
-from core import geo
+from core import config, geo
 from services import dispatch
 from tests.fake_db import FakeDB
 
@@ -100,7 +100,14 @@ def test_offer_message_has_no_contact_or_exact_location(world):
     assert "24.92" not in text
 
 
-def test_offer_skips_busy_volunteers_and_previous_offers(world):
+def test_offer_skips_busy_volunteers_and_previous_offers(world, monkeypatch):
+    """At the shipped cap of one case each, a volunteer mid-case is skipped.
+
+    Pinned explicitly because VOLUNTEER_MAX_CASES is configurable: a demo
+    .env raises it so two handsets can stand in for a neighbourhood, and
+    without this the test would read that deployment choice as a regression.
+    """
+    monkeypatch.setattr(config, "VOLUNTEER_MAX_CASES", 1)
     _case(world["db"])
     _volunteer(world["db"], 1, "923000000001", 24.9201, 67.0901)
     _volunteer(world["db"], 2, "923000000002", 24.9202, 67.0902)

@@ -45,9 +45,73 @@ class ResponderLinkRequest(BaseModel):
 
 @router.get("/api/cases")
 def list_cases() -> List[Dict[str, Any]]:
-    """The ranked queue. Open work first, then everything for the timeline."""
+    """The ranked queue. Open work first, then everything for the timeline.
+
+    Five queries, whatever the queue length. The obvious version -- build each
+    case's view on its own -- costs four round trips per case, and against a
+    hosted database that is seconds of dead air on the one screen a
+    coordinator is staring at while deciding what to do next.
+    """
     cases = store.by_priority(store.select("cases"))
-    return [_case_view(case, include_children=False) for case in cases]
+    if not cases:
+        return []
+
+    incidents = store.index_by(
+        store.select_in("incidents", "id", (c.get("incident_id") for c in cases))
+    )
+    people = store.index_by(
+        store.select_in("people", "id", (c.get("person_id") for c in cases))
+    )
+    zones = store.index_by(
+        store.select_in(
+            "zones", "id", (i.get("zone_id") for i in incidents.values())
+        )
+    )
+
+    # One query for every dispatch across the whole queue, counted in memory.
+    counts: Dict[Any, int] = {}
+    for row in store.select_in("dispatches", "case_id", (c.get("id") for c in cases)):
+        counts[row.get("case_id")] = counts.get(row.get("case_id"), 0) + 1
+
+    views = []
+    for case in cases:
+        incident = incidents.get(case.get("incident_id"))
+        person = people.get(case.get("person_id"))
+        zone = zones.get(incident.get("zone_id")) if incident else None
+        views.append(
+            _assemble(case, incident, person, zone, counts.get(case.get("id"), 0))
+        )
+    return views
+
+
+def _assemble(
+    case: Dict[str, Any],
+    incident: Optional[Dict[str, Any]],
+    person: Optional[Dict[str, Any]],
+    zone: Optional[Dict[str, Any]],
+    dispatch_count: int,
+) -> Dict[str, Any]:
+    """Build one case view from rows already in hand.
+
+    The single source of truth for the shape of a case as the frontend sees
+    it. ``_case_view`` fetches the rows and calls this; the queue endpoint
+    fetches them in bulk and calls this. Two assemblers would drift.
+    """
+    view: Dict[str, Any] = dict(case)
+    view["incident"] = incident
+    # First name only: the phone number is released on ACCEPT, not here.
+    view["person"] = (
+        {
+            "id": person.get("id"),
+            "first_name": person.get("first_name"),
+            "person_vuln": person.get("person_vuln") or {},
+        }
+        if person
+        else None
+    )
+    view["zone"] = zone
+    view["dispatch_count"] = dispatch_count
+    return view
 
 
 @router.get("/api/cases/{case_id}")
@@ -127,20 +191,13 @@ def _case_view(case: Dict[str, Any], include_children: bool) -> Dict[str, Any]:
         else None
     )
 
-    view: Dict[str, Any] = dict(case)
-    view["incident"] = incident
-    # First name only: the phone number is released on ACCEPT, not here.
-    view["person"] = (
-        {
-            "id": person.get("id"),
-            "first_name": person.get("first_name"),
-            "person_vuln": person.get("person_vuln") or {},
-        }
-        if person
-        else None
+    view = _assemble(
+        case,
+        incident,
+        person,
+        zone,
+        len(store.select("dispatches", case_id=case.get("id"))),
     )
-    view["zone"] = zone
-    view["dispatch_count"] = len(store.select("dispatches", case_id=case.get("id")))
     if include_children:
         view["responder_links"] = [
             {key: link.get(key) for key in ("token", "target_label", "created_at", "expires_at")}

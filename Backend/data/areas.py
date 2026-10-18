@@ -93,13 +93,32 @@ DISTRICT_GROUPS: Dict[str, str] = {
 # matcher; the model handles the rest, including typos. Every alias is unique
 # across the whole list: an alias that matched two areas would make the
 # offline matcher pick one of them at random.
+#
+# Landmarks are different from aliases. An alias is another way of writing the
+# area's OWN name ("jauhar" for Gulistan-e-Jauhar). A landmark is a place
+# INSIDE the area that people name instead of the area -- nobody in an
+# emergency writes "Gulshan-e-Iqbal", they write "Muskan" or "NIPA".
+#
+# They matter because the model only ever sees what prompt_list() shows it.
+# Before landmarks existed that was the id and the display name, so "muskan
+# chowrangi me aag lag gayi" resolved to nothing, the incident was created
+# location_unknown, and AGENTS.md 9 bars an unlocated case from reaching a
+# volunteer at all. A landmark is not decoration; it is the difference between
+# a case being dispatchable and not.
+#
+# ⚠ EVERY LANDMARK BELOW NEEDS LOCAL VERIFICATION. A wrong mapping is worse
+# than a missing one: a missing landmark leaves the case unlocated and visible
+# to the coordinator, while a wrong one silently sends a volunteer to the
+# wrong district and nobody finds out until they arrive. Check each line
+# against what you actually know of the city, and delete any you are unsure
+# of. Landmarks share the alias namespace, so they must be unique too.
 AREAS: Tuple[Dict[str, Any], ...] = (
     # ═══ GROUP A ════════════════════════════════════════════════════════════
 
     # ─── Karachi East (Gulshan District) ────────────────────────────────────
     # Sub-divisions: Ferozabad, Gulshan-e-Iqbal, Gulzar-e-Hijri, Jamshed Qrs.
-    {"id": "gulshan", "name": "Gulshan-e-Iqbal", "lat": 24.9200, "lng": 67.0970, "district": DISTRICT_EAST, "risk_level": "critical", "aliases": ("gulshan e iqbal", "gulshan iqbal")},
-    {"id": "johar", "name": "Gulistan-e-Jauhar", "lat": 24.9180, "lng": 67.1300, "district": DISTRICT_EAST, "risk_level": "elevated", "aliases": ("gulistan e jauhar", "gulistan e johar", "jauhar", "johar")},
+    {"id": "gulshan", "name": "Gulshan-e-Iqbal", "lat": 24.9200, "lng": 67.0970, "district": DISTRICT_EAST, "risk_level": "critical", "aliases": ("gulshan e iqbal", "gulshan iqbal"), "landmarks": ("nipa", "nipa chowrangi", "hasan square", "muskan", "muskan chowrangi", "expo centre", "expo center", "safari park", "urdu university", "disco bakery", "gulshan chowrangi",)},
+    {"id": "johar", "name": "Gulistan-e-Jauhar", "lat": 24.9180, "lng": 67.1300, "district": DISTRICT_EAST, "risk_level": "elevated", "aliases": ("gulistan e jauhar", "gulistan e johar", "jauhar", "johar"), "landmarks": ("perfume chowk", "munawar chowrangi", "kamran chowrangi", "pehlwan goth", "rabia city", "jauhar chowrangi", "johar chowrangi",)},
     {"id": "gulzar-e-hijri", "name": "Gulzar-e-Hijri", "lat": 24.9400, "lng": 67.1300, "district": DISTRICT_EAST, "risk_level": "elevated", "aliases": ("gulzar hijri",)},
     {"id": "safoora", "name": "Safoora Goth", "lat": 24.9400, "lng": 67.1500, "district": DISTRICT_EAST, "risk_level": "elevated", "aliases": ("safora", "safoora chowrangi")},
     {"id": "scheme-33", "name": "Scheme 33", "lat": 24.9300, "lng": 67.1400, "district": DISTRICT_EAST, "risk_level": "elevated", "aliases": ("scheme33", "scheme thirty three")},
@@ -116,9 +135,9 @@ AREAS: Tuple[Dict[str, Any], ...] = (
 
     # ─── Korangi District ───────────────────────────────────────────────────
     # Sub-divisions: Korangi, Landhi, Model Colony, Shah Faisal.
-    {"id": "korangi", "name": "Korangi", "lat": 24.8400, "lng": 67.1300, "district": DISTRICT_KORANGI, "risk_level": "elevated", "aliases": ("korangi crossing", "korangi town")},
+    {"id": "korangi", "name": "Korangi", "lat": 24.8400, "lng": 67.1300, "district": DISTRICT_KORANGI, "risk_level": "elevated", "aliases": ("korangi crossing", "korangi town"), "landmarks": ("mehran town", "korangi number 5", "singer chowrangi",)},
     {"id": "korangi-industrial", "name": "Korangi Industrial Area", "lat": 24.8330, "lng": 67.1480, "district": DISTRICT_KORANGI, "risk_level": "elevated", "aliases": ("korangi industrial", "korangi industrial estate")},
-    {"id": "landhi", "name": "Landhi", "lat": 24.8500, "lng": 67.1900, "district": DISTRICT_KORANGI, "risk_level": "elevated", "aliases": ("landhi town",)},
+    {"id": "landhi", "name": "Landhi", "lat": 24.8500, "lng": 67.1900, "district": DISTRICT_KORANGI, "risk_level": "elevated", "aliases": ("landhi town",), "landmarks": ("future colony", "sharafi goth", "babar market",)},
     {"id": "landhi-colony", "name": "Landhi Colony", "lat": 24.8420, "lng": 67.2050, "district": DISTRICT_KORANGI, "risk_level": "elevated", "aliases": ("landhi coloney",)},
     {"id": "nasir-colony", "name": "Nasir Colony", "lat": 24.8370, "lng": 67.1680, "district": DISTRICT_KORANGI, "risk_level": "critical", "aliases": ("nasir coloney",)},
     {"id": "zaman-town", "name": "Zaman Town", "lat": 24.8460, "lng": 67.1430, "district": DISTRICT_KORANGI, "risk_level": "elevated", "aliases": ("zamaan town",)},
@@ -131,7 +150,7 @@ AREAS: Tuple[Dict[str, Any], ...] = (
     # Sub-divisions: Airport, Bin Qasim, Gadap, Ibrahim Hyderi, Murad Memon,
     # Shah Mureed.
     {"id": "malir-cantt", "name": "Malir Cantt", "lat": 24.8900, "lng": 67.1900, "district": DISTRICT_MALIR, "risk_level": "normal", "aliases": ("malir cantonment", "malir")},
-    {"id": "malir-city", "name": "Malir City", "lat": 24.8930, "lng": 67.2050, "district": DISTRICT_MALIR, "risk_level": "elevated", "aliases": ("malir halt", "malir town", "malir no 1")},
+    {"id": "malir-city", "name": "Malir City", "lat": 24.8930, "lng": 67.2050, "district": DISTRICT_MALIR, "risk_level": "elevated", "aliases": ("malir halt", "malir town", "malir no 1"), "landmarks": ("jafar e tayyar", "khokhrapar",)},
     {"id": "airport", "name": "Airport", "lat": 24.9050, "lng": 67.1600, "district": DISTRICT_MALIR, "risk_level": "normal", "aliases": ("karachi airport", "jinnah airport", "jinnah terminal", "airport area")},
     {"id": "quaidabad", "name": "Quaidabad", "lat": 24.8680, "lng": 67.2370, "district": DISTRICT_MALIR, "risk_level": "elevated", "aliases": ("quaid abad", "kaidabad", "qaidabad")},
     {"id": "ibrahim-hyderi", "name": "Ibrahim Hyderi", "lat": 24.7800, "lng": 67.1800, "district": DISTRICT_MALIR, "risk_level": "critical", "aliases": ("ibrahim haidari", "ibrahim hydri")},
@@ -150,11 +169,11 @@ AREAS: Tuple[Dict[str, Any], ...] = (
     # named under South and under Keamari; it is listed once, under Keamari,
     # whose harbour it sits off. Both are group B, so nothing changes for
     # dispatch either way.
-    {"id": "saddar", "name": "Saddar", "lat": 24.8607, "lng": 67.0104, "district": DISTRICT_SOUTH, "risk_level": "normal", "aliases": ("sadar",)},
-    {"id": "clifton", "name": "Clifton", "lat": 24.8138, "lng": 67.0300, "district": DISTRICT_SOUTH, "risk_level": "elevated", "aliases": ()},
+    {"id": "saddar", "name": "Saddar", "lat": 24.8607, "lng": 67.0104, "district": DISTRICT_SOUTH, "risk_level": "normal", "aliases": ("sadar",), "landmarks": ("empress market", "zainab market", "regal chowk", "preedy street",)},
+    {"id": "clifton", "name": "Clifton", "lat": 24.8138, "lng": 67.0300, "district": DISTRICT_SOUTH, "risk_level": "elevated", "aliases": (), "landmarks": ("boat basin", "teen talwar", "sea view", "seaview", "do talwar",)},
     {"id": "bath-island", "name": "Bath Island", "lat": 24.8280, "lng": 67.0270, "district": DISTRICT_SOUTH, "risk_level": "normal", "aliases": ("bathisland",)},
-    {"id": "dha", "name": "DHA", "lat": 24.8008, "lng": 67.0518, "district": DISTRICT_SOUTH, "risk_level": "normal", "aliases": ("defence", "defence housing", "d.h.a")},
-    {"id": "lyari", "name": "Lyari", "lat": 24.8730, "lng": 66.9970, "district": DISTRICT_SOUTH, "risk_level": "critical", "aliases": ("liyari", "lyari town")},
+    {"id": "dha", "name": "DHA", "lat": 24.8008, "lng": 67.0518, "district": DISTRICT_SOUTH, "risk_level": "normal", "aliases": ("defence", "defence housing", "d.h.a"), "landmarks": ("zamzama", "khayaban e ittehad", "khayaban e shahbaz", "do darya",)},
+    {"id": "lyari", "name": "Lyari", "lat": 24.8730, "lng": 66.9970, "district": DISTRICT_SOUTH, "risk_level": "critical", "aliases": ("liyari", "lyari town"), "landmarks": ("baghdadi", "chakiwara", "agra taj", "kalri",)},
     {"id": "kharadar", "name": "Kharadar", "lat": 24.8520, "lng": 66.9950, "district": DISTRICT_SOUTH, "risk_level": "elevated", "aliases": ("khara dar",)},
     {"id": "mithadar", "name": "Mithadar", "lat": 24.8545, "lng": 66.9930, "district": DISTRICT_SOUTH, "risk_level": "elevated", "aliases": ("mitha dar",)},
     {"id": "garden", "name": "Garden", "lat": 24.8740, "lng": 67.0220, "district": DISTRICT_SOUTH, "risk_level": "normal", "aliases": ("garden east", "garden west")},
@@ -164,18 +183,18 @@ AREAS: Tuple[Dict[str, Any], ...] = (
     # ─── Karachi Central (Nazimabad District) ───────────────────────────────
     # Sub-divisions: Gulberg, Liaquatabad, Nazimabad, North Nazimabad,
     # New Karachi, New Nazimabad.
-    {"id": "nazimabad", "name": "Nazimabad", "lat": 24.9100, "lng": 67.0300, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ()},
+    {"id": "nazimabad", "name": "Nazimabad", "lat": 24.9100, "lng": 67.0300, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": (), "landmarks": ("golimar", "nazimabad number 1", "petrol pump chowrangi",)},
     {"id": "north-nazimabad", "name": "North Nazimabad", "lat": 24.9400, "lng": 67.0400, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ("nnazimabad",)},
     {"id": "new-nazimabad", "name": "New Nazimabad", "lat": 24.9480, "lng": 67.0250, "district": DISTRICT_CENTRAL, "risk_level": "normal", "aliases": ("new nazimabad scheme",)},
-    {"id": "liaquatabad", "name": "Liaquatabad", "lat": 24.9000, "lng": 67.0400, "district": DISTRICT_CENTRAL, "risk_level": "critical", "aliases": ("lalukhet", "liaqatabad", "liyaquatabad")},
+    {"id": "liaquatabad", "name": "Liaquatabad", "lat": 24.9000, "lng": 67.0400, "district": DISTRICT_CENTRAL, "risk_level": "critical", "aliases": ("lalukhet", "liaqatabad", "liyaquatabad"), "landmarks": ("liaquatabad number 10", "dak khana",)},
     {"id": "abbasi-shaheed", "name": "Abbasi Shaheed", "lat": 24.9150, "lng": 67.0460, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ("abbasi shaheed hospital", "abbasi shaheed colony")},
     {"id": "gulberg", "name": "Gulberg", "lat": 24.9300, "lng": 67.0550, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ()},
-    {"id": "fb-area", "name": "Federal B. Area", "lat": 24.9230, "lng": 67.0620, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ("fb area", "f.b. area", "federal b area", "federal bee area", "f b area")},
+    {"id": "fb-area", "name": "Federal B. Area", "lat": 24.9230, "lng": 67.0620, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ("fb area", "f.b. area", "federal b area", "federal bee area", "f b area"), "landmarks": ("water pump", "water pump chowrangi", "ayesha manzil", "karimabad",)},
     {"id": "ancholi", "name": "Ancholi", "lat": 24.9290, "lng": 67.0470, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ("ancholi block 20", "anchuli")},
     {"id": "azizabad", "name": "Azizabad", "lat": 24.9230, "lng": 67.0530, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ("aziz abad",)},
     {"id": "hyderi", "name": "Hyderi", "lat": 24.9390, "lng": 67.0370, "district": DISTRICT_CENTRAL, "risk_level": "normal", "aliases": ("hyderi market", "haideri", "hydri")},
-    {"id": "new-karachi", "name": "New Karachi", "lat": 24.9900, "lng": 67.0700, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ()},
-    {"id": "north-karachi", "name": "North Karachi", "lat": 24.9700, "lng": 67.0600, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ()},
+    {"id": "new-karachi", "name": "New Karachi", "lat": 24.9900, "lng": 67.0700, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": (), "landmarks": ("godhra", "sir syed", "new karachi number 5",)},
+    {"id": "north-karachi", "name": "North Karachi", "lat": 24.9700, "lng": 67.0600, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": (), "landmarks": ("power house", "power house chowrangi", "five star chowrangi",)},
     {"id": "buffer-zone", "name": "Buffer Zone", "lat": 24.9600, "lng": 67.0650, "district": DISTRICT_CENTRAL, "risk_level": "elevated", "aliases": ()},
     {"id": "shadman", "name": "Shadman Town", "lat": 24.9650, "lng": 67.0600, "district": DISTRICT_CENTRAL, "risk_level": "normal", "aliases": ("shadman",)},
     {"id": "sakhi-hassan", "name": "Sakhi Hassan", "lat": 24.9450, "lng": 67.0380, "district": DISTRICT_CENTRAL, "risk_level": "normal", "aliases": ()},
@@ -186,22 +205,22 @@ AREAS: Tuple[Dict[str, Any], ...] = (
     # Sub-divisions: Mango Pir, Mominabad, Orangi Town. "Baldia Colony" in the
     # west is the same place people call Baldia Town, which sits under Keamari
     # below -- one pin, not two.
-    {"id": "orangi", "name": "Orangi Town", "lat": 24.9500, "lng": 66.9800, "district": DISTRICT_WEST, "risk_level": "critical", "aliases": ("orangi",)},
+    {"id": "orangi", "name": "Orangi Town", "lat": 24.9500, "lng": 66.9800, "district": DISTRICT_WEST, "risk_level": "critical", "aliases": ("orangi",), "landmarks": ("qasba colony", "iqbal market", "orangi number 5",)},
     {"id": "mominabad", "name": "Mominabad", "lat": 24.9400, "lng": 66.9700, "district": DISTRICT_WEST, "risk_level": "elevated", "aliases": ("momin abad",)},
     {"id": "manghopir", "name": "Manghopir", "lat": 25.0000, "lng": 66.9800, "district": DISTRICT_WEST, "risk_level": "elevated", "aliases": ("mangopir", "mangho pir", "mango pir")},
     {"id": "banaras", "name": "Banaras", "lat": 24.9200, "lng": 66.9900, "district": DISTRICT_WEST, "risk_level": "elevated", "aliases": ("banaras chowk", "banaras colony")},
     {"id": "metroville", "name": "Metroville", "lat": 24.9300, "lng": 66.9930, "district": DISTRICT_WEST, "risk_level": "elevated", "aliases": ("metro ville", "metroville site")},
-    {"id": "surjani", "name": "Surjani Town", "lat": 25.0100, "lng": 67.0600, "district": DISTRICT_WEST, "risk_level": "critical", "aliases": ("surjani",)},
+    {"id": "surjani", "name": "Surjani Town", "lat": 25.0100, "lng": 67.0600, "district": DISTRICT_WEST, "risk_level": "critical", "aliases": ("surjani",), "landmarks": ("khuda ki basti", "surjani number 5",)},
 
     # ─── Keamari District ───────────────────────────────────────────────────
     # Sub-divisions: Baldia, Harbor, Maripur, SITE.
-    {"id": "keamari", "name": "Keamari", "lat": 24.8400, "lng": 66.9800, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("kemari", "kiamari")},
+    {"id": "keamari", "name": "Keamari", "lat": 24.8400, "lng": 66.9800, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("kemari", "kiamari"), "landmarks": ("jackson market", "ice factory",)},
     {"id": "harbour", "name": "Keamari Harbour", "lat": 24.8450, "lng": 66.9680, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("harbour", "harbor", "karachi port", "kemari harbour", "west wharf")},
     {"id": "manora", "name": "Manora", "lat": 24.7960, "lng": 66.9770, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("manora island", "manoora", "manohra")},
     {"id": "maripur", "name": "Maripur", "lat": 24.8600, "lng": 66.9500, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("mauripur",)},
     {"id": "hawksbay", "name": "Hawksbay", "lat": 24.8500, "lng": 66.8500, "district": DISTRICT_KEAMARI, "risk_level": "normal", "aliases": ("hawks bay",)},
     {"id": "baldia", "name": "Baldia Town", "lat": 24.9200, "lng": 66.9600, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("baldia", "baldia colony")},
-    {"id": "site", "name": "SITE Area", "lat": 24.9100, "lng": 67.0000, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("site town", "s.i.t.e")},
+    {"id": "site", "name": "SITE Area", "lat": 24.9100, "lng": 67.0000, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("site town", "s.i.t.e"), "landmarks": ("sher shah", "metroville chowrangi", "site industrial",)},
     {"id": "pak-colony", "name": "Pak Colony", "lat": 24.9000, "lng": 66.9900, "district": DISTRICT_KEAMARI, "risk_level": "elevated", "aliases": ("pak coloney",)},
 )
 
@@ -248,13 +267,24 @@ def prompt_list() -> str:
     "Jauhar" and a typo like "Guilstan" onto ``johar`` itself, rather than us
     trying to anticipate every spelling in a regex.
     """
-    return "\n".join(f"{area['id']} ({area['name']})" for area in AREAS)
+    lines = []
+    for area in AREAS:
+        line = f"{area['id']} ({area['name']}"
+        marks = area.get("landmarks", ())
+        if marks:
+            # Only a handful per area: the list is already 78 lines and the
+            # point is to anchor the common names, not to reproduce a gazetteer
+            # inside the prompt.
+            line += "; incl. " + ", ".join(marks[:6])
+        lines.append(line + ")")
+    return "\n".join(lines)
 
 
 def search_index() -> List[Tuple[str, str]]:
     """``(searchable text, area id)`` pairs for the offline fallback matcher.
 
-    Includes the id, the display name and every alias.
+    Includes the id, the display name, every alias and every landmark, so the
+    offline matcher resolves "muskan" with the model unreachable too.
     """
     index: List[Tuple[str, str]] = []
     for area in AREAS:
@@ -262,4 +292,81 @@ def search_index() -> List[Tuple[str, str]]:
         index.append((area["name"].lower(), area["id"]))
         for alias in area.get("aliases", ()):
             index.append((alias.lower(), area["id"]))
+        for landmark in area.get("landmarks", ()):
+            index.append((landmark.lower(), area["id"]))
     return index
+
+
+# ─── Localities ────────────────────────────────────────────────────────────
+#
+# The 78 areas above are the unit SafeZone dispatches on. They are not what
+# people type. Someone whose street is under water writes "Muskan",
+# "Hussainabad", "Sindhi Muslim" -- the locality they live in, not the
+# administrative area it sits inside.
+#
+# ``data/localities.json`` closes that gap. It is generated by
+# ``scripts/build_localities.py`` from OpenStreetMap and committed, so nothing
+# here calls a network service: a geocoding request during a flood is a
+# dependency on the thing that is failing, on the path that decides whether
+# someone is reachable at all.
+#
+# Every entry carries its own coordinates, which is the real prize. The area
+# assignment is computed from those coordinates against the centroids above,
+# so no human and no model guessed it. A caller that wants a point rather than
+# an area id should take ``lat``/``lng`` from the match -- they are the real
+# location of the locality, not the rough centre of a whole area.
+#
+# The file is optional. Without it everything above behaves exactly as before,
+# which is what keeps a fresh clone working before anyone runs the build step.
+
+_LOCALITY_INDEX: Optional[List[Tuple[str, Dict[str, Any]]]] = None
+
+
+def _locality_index() -> List[Tuple[str, Dict[str, Any]]]:
+    """``(searchable text, row)`` pairs, longest phrase first.
+
+    Loaded once, lazily. Longest first so "north nazimabad" is tried before
+    "nazimabad" -- the same rule the area index uses, for the same reason.
+    """
+    global _LOCALITY_INDEX
+    if _LOCALITY_INDEX is not None:
+        return _LOCALITY_INDEX
+
+    import json
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parent / "localities.json"
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        rows: Mapping[str, Any] = payload.get("localities", {})
+    except (OSError, ValueError):
+        # Absent or unreadable is a normal state, not an error: the file is a
+        # build artefact and a clone that has not built it still works.
+        rows = {}
+
+    _LOCALITY_INDEX = sorted(
+        ((key, dict(row)) for key, row in rows.items() if isinstance(row, Mapping)),
+        key=lambda pair: -len(pair[0]),
+    )
+    return _LOCALITY_INDEX
+
+
+def locality_count() -> int:
+    """How many localities are loaded. Zero when the file has not been built."""
+    return len(_locality_index())
+
+
+def find_locality(text: str) -> Optional[Dict[str, Any]]:
+    """The locality named anywhere in free text, or ``None``.
+
+    Returns the whole row -- ``name``, ``lat``, ``lng``, ``area`` -- because
+    the coordinates are better evidence than the area id. An area centroid is
+    the rough middle of a whole neighbourhood; a locality point is where the
+    locality actually is.
+    """
+    flat = "".join(ch if ch.isalnum() else " " for ch in (text or "").lower())
+    haystack = " " + " ".join(flat.split()) + " "
+    for phrase, row in _locality_index():
+        if " " + phrase + " " in haystack:
+            return row
+    return None

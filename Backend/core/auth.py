@@ -142,7 +142,7 @@ def read_session(token: Optional[str]) -> Optional[str]:
 
     # A session signed for an account that has since been changed in the
     # environment must not keep working.
-    if email.lower() != config.ADMIN_EMAIL.strip().lower():
+    if email.lower() not in config.admin_emails():
         return None
 
     return email
@@ -156,14 +156,18 @@ def authenticate(email: str, password: str) -> str:
     """
     if not is_configured():
         raise AuthError(
-            "Admin login is not configured on this server. Set ADMIN_EMAIL, "
+            "Admin login is not configured on this server. Set ADMIN_EMAILS, "
             "ADMIN_PASSWORD_HASH and SESSION_SECRET."
         )
 
     given = (email or "").strip().lower()
-    expected_email = config.ADMIN_EMAIL.strip().lower()
 
-    email_ok = hmac.compare_digest(given, expected_email)
+    # compare_digest against every configured address rather than `in`, so the
+    # time taken does not depend on which address matched, or whether one did.
+    email_ok = False
+    for candidate in config.admin_emails():
+        if hmac.compare_digest(given, candidate):
+            email_ok = True
     password_ok = verify_password(password or "", config.ADMIN_PASSWORD_HASH)
 
     # Both are evaluated before branching, so the response time does not
@@ -171,13 +175,13 @@ def authenticate(email: str, password: str) -> str:
     if not (email_ok and password_ok):
         raise AuthError("Email or password is incorrect.")
 
-    return expected_email
+    return given
 
 
 def is_configured() -> bool:
     """Whether this server can authenticate anyone at all."""
     return bool(
-        config.ADMIN_EMAIL.strip()
+        config.admin_emails()
         and config.ADMIN_PASSWORD_HASH.strip()
         and config.SESSION_SECRET.strip()
     )

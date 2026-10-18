@@ -1,4 +1,5 @@
 from core import config
+import os
 import pytest
 
 from services import protocol
@@ -110,6 +111,14 @@ def test_a_real_number_carries_no_caveat(monkeypatch):
     assert "simulated_emergency_number" not in path
 
 
+@pytest.mark.skipif(
+    os.getenv("SHOW_SIMULATION_LABELS", "") != "",
+    reason=(
+        "This documents the shipped default. The environment overrides it here, "
+        "which is a deployment decision -- labels belong ON whenever "
+        "ALLOWLIST_ONLY is off and a stranger could reach the number."
+    ),
+)
 def test_message_caveats_default_off():
     """A controlled demo needs no caveat; every recipient is allow-listed."""
     import importlib

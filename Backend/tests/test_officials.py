@@ -5,6 +5,7 @@ the routing one: SafeZone has no integration with any emergency service or
 NGO, and nothing it produces may imply otherwise (AGENTS.md 2.2).
 """
 
+import os
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -61,6 +62,14 @@ def test_a_handoff_is_always_flagged_simulated_in_the_data():
         assert officials.handoff(category)["simulated"] is True
 
 
+@pytest.mark.skipif(
+    os.getenv("SHOW_SIMULATION_LABELS", "") != "",
+    reason=(
+        "This documents the shipped default. The environment overrides it here, "
+        "which is a deployment decision -- labels belong ON whenever "
+        "ALLOWLIST_ONLY is off and a stranger could reach the number."
+    ),
+)
 def test_message_labels_are_off_by_default():
     """In a controlled demo every recipient is allow-listed and already knows."""
     assert config.SHOW_SIMULATION_LABELS is False
@@ -254,6 +263,14 @@ def _handoff_message(monkeypatch, category="fire", **kwargs):
     return sent
 
 
+@pytest.mark.skipif(
+    os.getenv("SHOW_SIMULATION_LABELS", "") != "",
+    reason=(
+        "This documents the shipped default. The environment overrides it here, "
+        "which is a deployment decision -- labels belong ON whenever "
+        "ALLOWLIST_ONLY is off and a stranger could reach the number."
+    ),
+)
 def test_the_handoff_is_clean_by_default(monkeypatch):
     sent = _handoff_message(monkeypatch, area="Gulshan-e-Iqbal")
 

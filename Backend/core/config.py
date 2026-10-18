@@ -96,8 +96,34 @@ PERSON_SILENCE_TIMEOUT_S: int = _get_int("PERSON_SILENCE_TIMEOUT_S", 900)
 GLOBAL_MESSAGE_CAP: int = _get_int("GLOBAL_MESSAGE_CAP", 500)
 # Absolute base for responder links handed to official desks. Relative links
 # work locally; set this to the deployed origin before the demo.
-PUBLIC_BASE_URL: str = os.getenv("PUBLIC_BASE_URL", "").strip().rstrip("/")
+#
+# The ORIGIN, not an endpoint. Pasting the webhook URL here produces
+# ".../webhook/whatsapp/r/<token>", which 404s -- and it 404s in the one place
+# nobody checks, on a fire crew's phone, in the rain. So the obvious wrong
+# pastes are stripped rather than trusted: a misconfigured handoff link is a
+# silent failure, and this costs three lines.
+def _origin(raw: str) -> str:
+    value = (raw or "").strip().rstrip("/")
+    for suffix in ("/webhook/whatsapp", "/webhook", "/api"):
+        if value.endswith(suffix):
+            value = value[: -len(suffix)].rstrip("/")
+    return value
+
+
+PUBLIC_BASE_URL: str = _origin(os.getenv("PUBLIC_BASE_URL", ""))
 RESPONDER_LINK_TTL_HOURS: int = _get_int("RESPONDER_LINK_TTL_HOURS", 24)
+
+# How many live cases one volunteer may hold at once.
+#
+# One is the honest number and the default. A neighbour who has accepted a
+# case is walking to it; handing them a second is how both get done badly,
+# and AGENTS.md 8 skips a busy volunteer for exactly that reason.
+#
+# A rehearsal is different. The demo pool is two handsets, so the second case
+# of any run finds nobody free and the queue stalls on a limit that is about
+# human attention, not about the software. Raising this for a demo is a
+# staging decision; raising it in a deployment would be a safety one.
+VOLUNTEER_MAX_CASES: int = max(1, _get_int("VOLUNTEER_MAX_CASES", 1))
 
 # ─── Control-room login ────────────────────────────────────────────────────
 # The coordinator surfaces show reporter names, numbers and exact locations,
@@ -110,7 +136,30 @@ RESPONDER_LINK_TTL_HOURS: int = _get_int("RESPONDER_LINK_TTL_HOURS", 24)
 #
 # With any of the three empty the server refuses every login rather than
 # falling open, and says so plainly at startup.
-ADMIN_EMAIL: str = os.getenv("ADMIN_EMAIL", "").strip()
+# One setting holding one address or a comma-separated several, because the
+# whole team signs into one control room during the event. ADMIN_EMAILS is
+# read as the preferred spelling and folded into the same value, so a .env
+# using either name works.
+#
+# They share one password hash. That is a real weakness, named rather than
+# hidden: there is no per-user credential, so a leak is a leak for everyone and
+# the logs cannot say which of them signed in. Acceptable for a weekend
+# prototype with one shared console; not for a deployment.
+ADMIN_EMAIL: str = (
+    os.getenv("ADMIN_EMAILS", "") or os.getenv("ADMIN_EMAIL", "")
+).strip()
+
+
+def admin_emails() -> tuple:
+    """The addresses allowed to sign in, lowercased.
+
+    Split here rather than at import so that setting ``ADMIN_EMAIL`` at
+    runtime -- which tests do, and which is the only way to prove that
+    changing it ends an existing session -- actually takes effect.
+    """
+    return tuple(
+        part.strip().lower() for part in ADMIN_EMAIL.split(",") if part.strip()
+    )
 ADMIN_PASSWORD_HASH: str = os.getenv("ADMIN_PASSWORD_HASH", "").strip()
 SESSION_SECRET: str = os.getenv("SESSION_SECRET", "").strip()
 SESSION_TTL_HOURS: int = _get_int("SESSION_TTL_HOURS", 12)

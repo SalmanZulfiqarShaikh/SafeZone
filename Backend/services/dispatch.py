@@ -95,16 +95,23 @@ def offer_case(case_id: int, ring: int = 1) -> List[int]:
         logger.warning("Case %s has no coordinates; cannot rank volunteers", case_id)
         return []
 
+    # Above a cap of one, a volunteer already holding a case is still a
+    # candidate, so "busy" rows are considered too. The count below is what
+    # actually decides; the status is only a label.
     on_duty = _select("volunteers", status="on_duty")
+    if config.VOLUNTEER_MAX_CASES > 1:
+        on_duty = on_duty + _select("volunteers", status="busy")
     if not on_duty:
         logger.warning("No volunteers are on duty for case %s", case_id)
         return []
 
-    busy_ids = {
-        row.get("volunteer_id")
-        for row in _select("dispatches")
-        if row.get("status") in ACTIVE_DISPATCH_STATUSES
-    }
+    # How many live cases each volunteer is already carrying. At a cap of one
+    # this is the old busy check exactly, so default behaviour is unchanged.
+    active_counts: Dict[Any, int] = {}
+    for row in _select("dispatches"):
+        if row.get("status") in ACTIVE_DISPATCH_STATUSES:
+            holder = row.get("volunteer_id")
+            active_counts[holder] = active_counts.get(holder, 0) + 1
     case_dispatches = _select("dispatches", case_id=case_id)
     already_offered = {row.get("volunteer_id") for row in case_dispatches}
 
@@ -121,7 +128,9 @@ def offer_case(case_id: int, ring: int = 1) -> List[int]:
     candidates = []
     for volunteer in on_duty:
         volunteer_id = volunteer.get("id")
-        if volunteer_id in busy_ids or volunteer_id in already_offered:
+        if active_counts.get(volunteer_id, 0) >= config.VOLUNTEER_MAX_CASES:
+            continue
+        if volunteer_id in already_offered:
             continue
         if volunteer.get("phone") in offered_phones:
             continue

@@ -171,8 +171,16 @@ export function useDashboard(): DashboardState {
     async (id: number, channel: Channel) => {
       setBusyCaseId(id);
       try {
-        await api.approveCase(id, channel);
+        const result = await api.approveCase(id, channel);
         await refreshCase(id);
+
+        // Approving a case and reaching a volunteer are two different things.
+        // The case is approved, the handoff link is minted -- and if nobody
+        // was on duty, eligible or locatable, no offer went anywhere. The
+        // backend says so in `dispatch_warning`; dropping it made a click
+        // that did half its job look like a click that did nothing, which is
+        // the worst thing a dispatch button can do.
+        setError(result.dispatch_warning ?? null);
       } catch (caught) {
         if (caught instanceof api.ApiError && caught.status === 401) {
           setUnauthorized(true);

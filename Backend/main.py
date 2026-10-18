@@ -13,6 +13,7 @@ from core.phone import mask
 from routes.admin import router as admin_router
 from routes.auth import require_admin, router as auth_router
 from routes.cases import router as cases_router
+from routes.chat import router as chat_router
 from routes.events import router as events_router
 from routes.register import router as register_router
 from routes.responder import router as responder_router
@@ -139,6 +140,10 @@ app.include_router(register_router)
 app.include_router(auth_router)
 app.include_router(zones_router)
 app.include_router(whatsapp_router)
+# Public, like the WhatsApp number it points at: the widget sits on the
+# landing page and nobody signs in to ask a question. The spending guards
+# live in the route itself (routes/chat.py), not in a dependency here.
+app.include_router(chat_router)
 
 # Behind the login. These carry reporter names, numbers and exact locations
 # (AGENTS.md 9), who is on duty and where, and the switch that stops every

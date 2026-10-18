@@ -270,10 +270,16 @@ def resolve_area(value: Any) -> Optional[str]:
 
 
 def _zone(text: str) -> Optional[str]:
-    """Find an area named anywhere in free text. The offline fallback path.
+    """Find an area named anywhere in free text.
 
-    Only used when every LLM provider is down; the model does this far better
-    because it understands landmarks and misspellings.
+    Three passes, strongest evidence first: the area list and its aliases and
+    landmarks, then the OpenStreetMap locality gazetteer.
+
+    Originally this ran only when every LLM provider was down. It now also
+    backs up the model, because the model declines rather than guesses on a
+    locality it does not recognise -- "muskan chowrangi me aag lag gayi"
+    returned nothing at all -- and a case with no area cannot reach a
+    volunteer (AGENTS.md 9).
     """
     # Hyphens become spaces on both sides, so "Gulistan-e-Jauhar" and
     # "Gulistan e Jauhar" are the same string by the time they are compared.
@@ -283,7 +289,13 @@ def _zone(text: str) -> Optional[str]:
         needle = " " + phrase.replace("-", " ") + " "
         if needle in haystack:
             return area_id
-    return None
+
+    # Then the locality gazetteer: thousands of OpenStreetMap place names,
+    # each with its own coordinates and a computed area. Tried second because
+    # an exact area or alias match is stronger evidence than a locality that
+    # merely sits inside one.
+    locality = areas.find_locality(text)
+    return locality["area"] if locality else None
 
 
 # ─── LLM extraction ────────────────────────────────────────────────────────
@@ -307,10 +319,10 @@ def _llm_extract(text: str) -> Dict[str, Any]:
         SYSTEM_PROMPT,
         USER_PROMPT_TEMPLATE.format(text=text),
     )
-    return _normalise(data)
+    return _normalise(data, text)
 
 
-def _normalise(data: Mapping[str, Any]) -> Dict[str, Any]:
+def _normalise(data: Mapping[str, Any], text: str = "") -> Dict[str, Any]:
     """Merge a model response with safe defaults; never trust its shape."""
     category = str(data.get("category") or "other").strip().lower()
     if category not in CATEGORIES:
@@ -371,7 +383,11 @@ def _normalise(data: Mapping[str, Any]) -> Dict[str, Any]:
         "urgency": urgency,
         "people_count": people_count,
         "location_text": location_text,
-        "zone_guess": resolve_area(data.get("zone_guess")),
+        # The model answers null for any locality it does not know, and null
+        # means an undispatchable case. Falling back to the deterministic
+        # matcher costs nothing and is the difference between a volunteer
+        # being offered this case and nobody seeing it.
+        "zone_guess": resolve_area(data.get("zone_guess")) or _zone(text),
         "vulnerability": normalised_vuln,
         "needs": needs,
         "missing_fields": missing_fields,

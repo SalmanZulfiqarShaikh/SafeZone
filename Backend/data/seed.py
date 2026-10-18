@@ -178,6 +178,17 @@ def _upsert_volunteer(db, volunteer: Mapping[str, Any]) -> bool:
     The volunteer sits at the centre of their first area, which is only ever
     used to rank rings. Re-seeding never resets status: a volunteer who sent
     ON DUTY stays on duty.
+
+    A new row starts on duty in demo mode and off duty otherwise. Real
+    volunteers must opt in -- being on duty means a stranger's emergency may
+    be sent to your phone, and nothing should decide that for you. The demo
+    pool is the team's own handsets, who have already agreed, and making them
+    send ON DUTY before every rehearsal buys nothing but a forgotten step.
+
+    This sets the database row only. It does NOT reopen the 24-hour WhatsApp
+    window -- only an inbound message from that handset does that, and
+    ``send_message`` will silently suppress an offer to a phone whose window
+    has closed. Each phone still has to message SafeZone before a demo.
     """
     existing = execute(
         db.table("volunteers").select("id").eq("phone", volunteer["phone"]).limit(1)
@@ -201,7 +212,8 @@ def _upsert_volunteer(db, volunteer: Mapping[str, Any]) -> bool:
         execute(db.table("volunteers").update(payload).eq("id", rows[0]["id"]))
         return False
 
-    execute(db.table("volunteers").insert({**payload, "status": "off_duty"}))
+    status = "on_duty" if config.DEMO_MODE else "off_duty"
+    execute(db.table("volunteers").insert({**payload, "status": status}))
     return True
 
 

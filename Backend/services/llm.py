@@ -198,3 +198,86 @@ def _chat(
     if not content:
         raise ValueError("empty response")
     return content
+
+
+def complete_chat(
+    messages: List[Dict[str, Any]],
+    *,
+    temperature: float = 0.3,
+    max_tokens: int = 500,
+    timeout: int = DEFAULT_TIMEOUT_S,
+    provider: Optional[str] = None,
+    api_key: str = "",
+    model: str = "",
+) -> str:
+    """Ask the first working provider for free text, given a message list.
+
+    The sibling of :func:`complete_json`. That one exists for the report
+    extraction on the critical path, where the answer must be a JSON object and
+    the temperature is zero. This one serves the website assistant, which is
+    *not* on the critical path: nobody is dispatched because of what it says,
+    so prose and a little warmth are fine.
+
+    It shares the provider chain deliberately. The assistant going quiet
+    because Gemini rate-limited during a demo is avoidable when DeepSeek and
+    Groq are already configured and idle.
+
+    ``messages`` is OpenAI shaped -- ``{"role": ..., "content": ...}`` -- where
+    content may be a string or the multimodal parts list. Providers without
+    vision fail a parts list and the chain moves on, which is the same path as
+    any other provider failure.
+
+    Raises:
+        LLMUnavailable: when nothing is configured, or every provider failed.
+    """
+    # A caller may pin one provider with a key of its own. The website
+    # assistant does: a separate key means a scraper that burns the chat quota
+    # cannot take report extraction down with it, and extraction is the one
+    # that sits near the critical path.
+    if api_key and provider:
+        pinned = PROVIDERS.get(provider)
+        if pinned is None:
+            raise LLMUnavailable(f"Unknown provider {provider!r}")
+        chain = [pinned]
+        overrides: Dict[str, tuple[str, str]] = {
+            pinned.name: (api_key, model or pinned.default_model)
+        }
+    else:
+        chain = provider_chain()
+        overrides = {}
+
+    if not chain:
+        raise LLMUnavailable(
+            "No LLM provider is configured. Set one of DEEPSEEK_API_KEY, "
+            "GROQ_API_KEY or GEMINI_API_KEY, or LLM_API_KEY with LLM_PROVIDER."
+        )
+
+    failures: List[str] = []
+    for candidate in chain:
+        key, name = overrides.get(candidate.name) or credentials(candidate.name)
+        try:
+            from openai import OpenAI
+
+            client = OpenAI(api_key=key, base_url=candidate.base_url)
+            response = client.chat.completions.create(
+                model=name,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                messages=messages,
+                timeout=timeout,
+            )
+            content = (response.choices[0].message.content or "").strip()
+        except Exception as exc:  # noqa: BLE001 - any provider failure is routine
+            # The key itself must never reach a log line.
+            logger.warning("LLM provider %s failed: %s", candidate.name, exc)
+            failures.append(f"{candidate.name}: {exc}")
+            continue
+
+        if not content:
+            failures.append(f"{candidate.name}: empty response")
+            continue
+
+        logger.info("Chat served by %s (%s)", candidate.name, name)
+        return content
+
+    raise LLMUnavailable("Every LLM provider failed -- " + "; ".join(failures))

@@ -93,6 +93,14 @@ def main(argv: List[str] | None = None) -> int:
         action="store_true",
         help="Clear without re-seeding zones and volunteers.",
     )
+    parser.add_argument(
+        "--off-duty",
+        action="store_true",
+        help=(
+            "Leave demo volunteers off duty. Without this, demo mode puts them "
+            "on duty so a rehearsal does not need ON DUTY from every handset."
+        ),
+    )
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(levelname)-7s %(message)s")
@@ -143,7 +151,36 @@ def main(argv: List[str] | None = None) -> int:
             f"covers {len(volunteer['zone_ids'])} areas{marker}"
         )
 
-    if args.keep_volunteers:
+    # Demo volunteers are the team's own handsets, who already agreed to be
+    # messaged, so making someone re-send ON DUTY before every rehearsal buys
+    # nothing but a step that gets forgotten. Real volunteers must still opt
+    # in: being on duty means a stranger's emergency can be sent to your
+    # phone, and no script should decide that for you.
+    if config.DEMO_MODE and not args.off_duty:
+        from core.db import execute
+
+        # "busy" is included on purpose. A volunteer is released by DONE
+        # (services/dispatch) or by the arrive-timeout sweep
+        # (services/silence), and both read dispatch rows that this script has
+        # just deleted. A rehearsal abandoned mid-case would otherwise leave
+        # someone busy with nothing left to free them, and they stop receiving
+        # offers without any error.
+        #
+        # There are no cases after a reset, so nobody can legitimately be busy
+        # at this point.
+        updated = execute(
+            client.table("volunteers")
+            .update({"status": "on_duty"})
+            .eq("is_demo", True)
+        )
+        rows = getattr(updated, "data", None) or []
+        print(f"\n{len(rows)} demo volunteers set ON DUTY.")
+        print(
+            "This is the database row only. It does NOT reopen the 24-hour\n"
+            "WhatsApp window -- each handset must still message SafeZone, or\n"
+            "its offers will be suppressed without an error."
+        )
+    elif args.keep_volunteers:
         print("\nExisting volunteers kept their duty status. Check with GET /api/volunteers.")
     else:
         print("\nVolunteers are seeded OFF DUTY. Each phone must send ON DUTY.")
