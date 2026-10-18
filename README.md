@@ -1,104 +1,115 @@
 # SafeZone
 
-**A high-performance, WhatsApp-first disaster triage system engineered for Karachi.**  
-*Winner at CODE//CONNECT'26 · UBIT, University of Karachi*
+**WhatsApp-first emergency triage for Karachi.**
 
-> SafeZone revolutionizes crisis response by cutting through the chaos of thousands of emergency messages, instantly extracting critical data, and delivering prioritized intelligence to emergency coordinators and field teams where it matters most.
+SafeZone finds who needs help during a disaster and gets that case to someone who can act, with everything they need. It is a prototype built by Team Nova Strike (Department of Computer Science, UBIT, University of Karachi) for CODE//CONNECT'26.
 
----
 
-## The Breakthrough Solution
-
-During severe monsoon flooding, emergency channels face a massive **information overload crisis**. The bottleneck isn't a shortage of resources or community volunteers; it is the inability to quickly sort through hundreds of incoming messages to identify critical, life-threatening situations in real time.
-
-SafeZone acts as an automated intelligence layer that intercepts chaotic, multi-lingual messages, structures them, and runs an instant prioritization matrix so that high-risk cases rise to the top of the action queue immediately.
-
-## Core Capabilities
-
-Citizens interact with a single, dedicated WhatsApp number using any natural phrasing — **English, Urdu, Roman Urdu, or mixed text**. Without downloading any apps, creating accounts, or filling out forms, SafeZone executes a robust pipeline within seconds:
-
-* **Instant Fail-Safe Guidance:** The system immediately replies with localized safety protocols and official emergency hotlines. This response fires instantly before any AI processing, entirely removing human or network delays from the first response.
-* **Geolocated Volunteer Coordination:** Utilizing precise spatial coordinates, the system automatically alerts the nearest on-duty community volunteers with a concise, privacy-safe, one-line incident brief.
-* **Intelligent Scoring & De-duplication:** Incoming distress signals are scored using an objective urgency and vulnerability index. To optimize resources, duplicate reports originating from the same street are automatically merged into a single actionable incident thread.
-* **Centralized Live Control Room:** Incidents stream directly onto a secure, real-time dashboard. High-level coordinators review automated triage scores alongside clear, plain-language reasoning to confirm and authorize formal rescue dispatches.
-* **Closed-Loop Verification:** Once an incident is marked resolved, the system automatically checks back with the original reporter via WhatsApp. If help failed to arrive, the ticket is instantly escalated back to the top of the queue.
-
-**Extensive Regional Footprint:** Fully localized and configured to cover **78 distinct areas across all seven districts** of Karachi Division.
+> **SafeZone does not rescue anyone.** It is not an emergency service. We have never pulled anyone out of anything, and we are not going to pretend otherwise. Fire and medical cases always point to the official number in the very first reply.
 
 ---
 
-## Elite System Architecture
+## The problem
 
-SafeZone is built from the ground up for maximum runtime resilience, reliability, and predictability under crisis conditions:
+During monsoon flooding, a fire, or a building collapse, people message whoever they can, and most of those messages reach nobody in a position to act. Official services are out there and overloaded. The bottleneck is not only a shortage of hands. It is sorting hundreds of messy, multilingual messages fast enough to know who needs help first.
 
-* **Isolated AI Fail-Safes:** The AI LLM is completely isolated from the runtime critical path. It operates exclusively to convert free text into structured JSON fields. If external AI API providers go offline, the core system continues accepting, ranking, calculating coordinates, and routing tickets without missing a beat.
-* **Centralized Security Gateway:** Outbound traffic routes through a single core function executing robust kill-switch protocols, dynamic rate-limiting, explicit domain allowlisting, and strict 24-hour delivery compliance checks.
-* **Immutable Event Sourcing:** Every architectural state change is logged as a discrete event, allowing developers to replay precise historical system timelines directly from the data logs.
-* **Rigorous Production Testing:** Shipped with **463 comprehensive unit and integration tests** passing with a 100% success rate, completely runnable offline without network dependencies or active API keys.
+SafeZone's job is to hand responders a complete case, not to compete with them.
 
-### The Tech Stack
-* **Backend:** Python 3.11+, FastAPI, Supabase (PostgreSQL), WhatsApp Cloud API.
-* **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Server-Sent Events (SSE).
+## How it works
 
----
+A person messages one WhatsApp number in English, Urdu, Roman Urdu, or a mix. No account, no form, nothing to install.
 
-## Quickstart Guide
+1. **Instant reply.** Safety steps and the official emergency number are sent straight away, before any AI step runs, so the first reply never waits on a model or a human.
+2. **Neighbours are asked.** The nearest on-duty volunteers for that area get a short, privacy-safe brief. No name, no number.
+3. **A coordinator is alerted.** The case is scored on urgency and who is at risk. Duplicate reports from the same street are merged into one case.
+4. **A coordinator approves the handoff.** This is the one step that waits for a human. On approval, a case link (details plus a map) is sent to the relevant service, such as Rescue 1122 for medical, fire, and trapped-person cases.
+5. **The loop is closed.** Volunteers reply `ACCEPT <case>`, `ARRIVED <case>`, and `DONE <case>`. When a case is marked done, SafeZone checks back with the original reporter on WhatsApp. If help did not arrive, the case goes back to the top of the queue.
 
-### Environment Setup
-Create a `.env` file at the repository root based on `.env.example` to securely configure your local secrets, WhatsApp credentials, and Supabase database endpoints.
+### Area alerts (optional)
 
-### 1. Backend Engine
-Launch the high-performance FastAPI server directly from the `Backend/` directory:
+Anyone can sign up on the website with a first name and an area (78 areas to choose from). A code is sent through WhatsApp, and after that SafeZone warns them early when something is reported nearby. Reply `STOP` at any time to stop alerts. None of this is needed to ask for help.
+
+### Control room
+
+Coordinators log in to a live dashboard with a map of open cases, urgency scores with plain-language reasoning, volunteer status and area assignments, and the approve-and-dispatch step.
+
+## What this is not
+
+Worth knowing now, rather than finding out in the middle of something.
+
+- **Not an emergency service.** We cannot send a boat or an ambulance ourselves.
+- **Volunteers are neighbours, not professionals.** In this prototype they are not vetted, trained, or insured, and they are asked to assess from a safe place.
+- **The handoff is a link, not an integration.** Responders get a page with everything on it. That is a message we send them, not a live connection into any organisation's system.
+- **The volunteer pool is our own phones.** In the prototype, volunteers are the team, labelled as demo volunteers everywhere they appear. The emergency number shown in demos is a teammate's phone, not a real service.
+- **Rescue 1122 is not affiliated with this project.** It is where cases are routed.
+
+## Design notes
+
+- **The AI is off the critical path.** The LLM only converts free text into structured fields. If the provider goes down, the system still accepts, ranks, locates, and routes cases.
+- **One outbound gateway.** All outbound messages go through a single function with a kill switch, rate limiting, a domain allowlist, and WhatsApp's 24-hour delivery window checks.
+- **Event sourcing.** Every state change is logged as an event, so a case's timeline can be replayed from the logs.
+- **Offline tests.** The backend test suite runs without network access or API keys.
+
+Coverage is 78 areas across all seven districts of Karachi, built from OpenStreetMap data.
+
+## Tech stack
+
+- **Backend:** Python 3.11+, FastAPI, Supabase (PostgreSQL), WhatsApp Cloud API
+- **Frontend:** React 19, TypeScript, Vite, Tailwind CSS v4, Server-Sent Events
+- **Deploy:** Docker on Fly.io
+
+## Getting started
+
+Create a `.env` file at the repository root from `.env.example` with your WhatsApp credentials, Supabase endpoints, and secrets.
+
+### Backend
+
 ```bash
 cd Backend
 python -m venv .venv
-source .venv/bin/activate  # On Windows use: .venv\Scripts\activate
+source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
-*Note: On initialization, the backend automatically audits your configuration and prints out any potential integration anomalies.*
 
-### 2. Frontend Interface
-Initialize the reactive dashboard user interface:
+On startup the backend checks your configuration and prints any problems it finds.
+
+### Frontend
+
 ```bash
 cd Frontend
 npm install
 npm run dev
 ```
-* The development server fires up on port `5173` and automatically reverse-proxies `/api` requests directly to the backend engine on port `8000`.
 
-### 3. Automated Test Suite
-Execute the offline test suite to verify system integrity:
+The dev server runs on port 5173 and proxies `/api` to the backend on port 8000.
+
+### Tests
+
 ```bash
 cd Backend
 python -m pytest -q
 ```
 
-### 4. Utilities & Optimization
-Generate secure cryptographic components for control room session authentication:
+### Utilities
+
 ```bash
-python -m scripts.hash_password
-```
-Compile and bootstrap localized OpenStreetMap spatial data files to enable runtime-free geocoding matches across Karachi:
-```bash
-python -m scripts.build_localities
+python -m scripts.hash_password      # hash a control room password
+python -m scripts.build_localities   # rebuild the OpenStreetMap locality data
 ```
 
----
+## Team
 
-## Engineering Team
+Team Nova Strike, Department of Computer Science, UBIT, University of Karachi.
 
-**Team Nova Strike** — Department of Computer Science (UBIT), University of Karachi
-
-* **Muhammad Salman** — [@SalmanZulfiqarShaikh](https://github.com)
-* **Hussain Abbas** — [@hussainabbas6706](https://github.com)
-* **Abdul Rehman** — [@mabdulrehmankhan666](https://github.com)
-* **Usaim** — [@usaim35](https://github.com)
+- Salman: [@SalmanZulfiqarShaikh](https://github.com/SalmanZulfiqarShaikh)
+- Hussain: [@hussainabbas6706](https://github.com/hussainabbas6706)
+- Abdul Rehman: [@mabdulrehmankhan666](https://github.com/mabdulrehmankhan666)
+- Usaim: [@usaim35](https://github.com/usaim35)
 
 For the community, by the community.
 
----
 
-## Data & Asset Attribution
-* **Spatial Data:** Locality parameters and boundary datasets provided by OpenStreetMap contributors under the Open Database License (ODbL).
-* **Specifications:** Detailed protocol mappings, non-negotiable architectural boundaries, and code ownership distribution can be found inside the comprehensive `AGENTS.md` file.
+## Attribution
+
+Locality and boundary data © OpenStreetMap contributors, available under the Open Database License (ODbL).
