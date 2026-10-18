@@ -46,17 +46,28 @@ export function Hero() {
         className="absolute inset-0 -z-10"
         style={reduceMotion ? undefined : { y: photoY, opacity: fade }}
       >
+        {/* Darkness comes from the photograph, not from a sheet of navy laid
+            over it. A heavy wash does make the page darker, but it fogs the
+            street into flat grey and the flood stops being visible, which is
+            the one thing this image is here to do. So: pull the exposure down
+            hard, then push contrast and saturation back up so the water, the
+            stalled traffic and the people wading still read.
+
+            Tuning: brightness = how dark. contrast = how much survives it. */}
         <img
           src={flooded}
-          alt="A flooded main road in Karachi during the monsoon — one of the emergencies SafeZone handles, alongside fire, medical and people trapped."
-          className="h-[115%] w-full object-cover brightness-[0.78] contrast-[1.5] saturate-[1.15]"
+          alt="A flooded road in Karachi during the monsoon — one of the emergencies SafeZone handles, alongside fire, medical and people trapped."
+          className="h-[115%] w-full object-cover brightness-[0.42] contrast-[1.55] saturate-[1.3]"
           loading="eager"
         />
-        {/* Two layers rather than one: a flat wash would grey the photo out,
-            while a gradient keeps the water readable at the top and gives the
-            text a solid footing at the bottom. */}
-        <div className="absolute inset-0 bg-gradient-to-r from-sz-header/92 via-sz-header/65 to-sz-header/25" />
-        <div className="absolute inset-0 bg-gradient-to-t from-sz-header/90 via-sz-header/20 to-sz-header/40" />
+        {/* With the photo itself dark, these only have to protect the text.
+            Left stays solid under the headline; the right is nearly clear so
+            the street shows through instead of sitting behind a veil. */}
+        <div className="absolute inset-0 bg-gradient-to-r from-sz-header/92 via-sz-header/45 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-sz-header via-transparent to-sz-header/45" />
+        {/* Corner vignette: darkens the edges without touching the middle,
+            which is where the flood is. */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_35%,rgba(0,0,0,0.55)_100%)]" />
       </motion.div>
 
       <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-20">

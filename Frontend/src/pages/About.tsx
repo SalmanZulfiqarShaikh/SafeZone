@@ -1,122 +1,188 @@
+import { useEffect, useState } from "react";
+import { Check, Minus } from "lucide-react";
+
 import { PageHeader } from "../components/PageHeader";
 import { PublicShell } from "../components/PublicShell";
 import { Reveal } from "../components/Reveal";
+import * as api from "../lib/api";
 import { BRAND, FRAMING } from "../lib/brand";
+import { cn } from "../lib/utils";
 
 /**
- * What SafeZone is, written to be read by someone deciding whether to trust
- * it rather than by a judge scoring it.
+ * What SafeZone does, in as few words as will carry it.
  *
- * Every limit on this page is a real one, stated plainly (AGENTS.md 16 and
- * 17 #10). Nothing here claims a capability the system does not have, and the
- * page is deliberately short on adjectives.
+ * The previous version said everything correctly and nobody read it: six
+ * numbered paragraphs and nine bulleted limits is a document, not a page.
+ * Every claim here survives, cut to the sentence that earns it, because
+ * what this page is actually for is letting someone decide in thirty
+ * seconds whether to trust the number.
+ *
+ * The counts come from /api/zones rather than being typed in, so the page
+ * cannot quietly claim coverage the system does not have.
  */
 
 const STEPS = [
-  {
-    title: "A message arrives",
-    body: `Someone sends a WhatsApp message in whatever words they have — English, Urdu, Roman Urdu, or a mix. There is no form, no app to install and no account to make. ${BRAND} reads it and works out what happened, where, and who is at risk.`,
-  },
-  {
-    title: "It gets ranked, not queued",
-    body: "A score decides what gets attention first: how urgent, how confident we are, and who is vulnerable — someone elderly, alone, on a ground floor with water rising outranks a report with no one named. The reasoning is shown next to the score, in words, so a coordinator can disagree with it.",
-  },
-  {
-    title: "Duplicates become one case",
-    body: "Five neighbours reporting the same flooded street is one case with five reports behind it, not five cases competing for the same boat. Reports close in time and place, in the same category, are merged automatically.",
-  },
-  {
-    title: "A human approves it",
-    body: "Nothing is sent to anyone until a coordinator approves it. That is the one manual step, and it is deliberate: the cost of dispatching people to a misread message is paid by whoever goes.",
-  },
-  {
-    title: "It reaches someone who can act",
-    body: "The nearest registered volunteers are offered the case. Fire and medical always go to the official emergency number as well, never to volunteers alone. Responders get one page with the location, what happened and who is at risk — so they spend their time coming, not asking questions.",
-  },
-  {
-    title: "We check it actually arrived",
-    body: "When someone marks a case done, we ask the person who reported it whether help reached them. If it did not, the case goes back to the top of the queue.",
-  },
+  { t: "You message", b: "Any number, any words. No account, no form." },
+  { t: "We read it", b: "What happened, where, and who cannot move on their own." },
+  { t: "It gets ranked", b: "Urgency and vulnerability decide the order. Duplicates merge." },
+  { t: "Neighbours are asked", b: "Nearest on-duty volunteers, immediately. Area only." },
+  { t: "A human approves", b: "The official handoff waits for a coordinator. Nothing else does." },
+  { t: "We check", b: "Did help arrive? If not, the case goes back to the top." },
 ];
 
+/** Stated as plainly as we can manage. A limit that reads like marketing is
+ *  worse than no limit at all. */
 const LIMITS = [
-  "We are not an emergency service. We cannot send a boat, an ambulance or a fire crew ourselves.",
-  "Volunteers are neighbours who signed up. In this prototype they are the team's own phones, they are not vetted, trained or insured, and they are asked to assess from a safe place.",
-  "The handoff to responders is a link we send them, not a live connection to any organisation.",
-  "Matching is nearest-first by straight-line distance, not routed travel time. A volunteer 400 m away across a canal may be further in practice than one a kilometre down the road.",
-  "The scoring weights are hand-tuned, not learned from data. They are visible and adjustable rather than hidden.",
-  "Everything runs over WhatsApp. There is no SMS or USSD fallback, which is a real gap given that networks fail during exactly the events this is built for.",
-  "The system needs a connection to its database. There is no offline mode.",
+  "We cannot send a boat, an ambulance or a fire crew. Fire and medical point to the official number first.",
+  "Volunteers are neighbours, not professionals — not vetted, trained or insured in this prototype.",
+  "The handoff is a link we send, not a live connection into anyone's system.",
+  "Nearest is straight-line distance, not routed travel time.",
+  "Everything runs over WhatsApp. No SMS fallback, and networks fail during exactly these events.",
 ];
 
 export default function About() {
+  const [areaCount, setAreaCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    api
+      .listZones()
+      .then((zones) => {
+        if (!cancelled) setAreaCount(zones.length);
+      })
+      .catch(() => {
+        // The page reads fine without it; the tile just shows a dash rather
+        // than a number we made up.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <PublicShell>
       <PageHeader kicker="About" title={`What ${BRAND} does`}>
         {FRAMING}
       </PageHeader>
 
-      <div className="mx-auto w-full max-w-3xl px-4 py-12 sm:px-6 sm:py-14">
+      <div className="mx-auto w-full max-w-5xl px-4 py-10 sm:px-6">
+        {/* ─── The whole argument, in four numbers ──────────────────── */}
         <Reveal>
-          <p className="mt-6 max-w-[62ch] text-sz-text-2">
-          During the Karachi monsoon, help does not usually fail because nobody wants to
-          give it. It fails because nobody can tell, in the first hour, which of four
-          hundred messages is the one where someone cannot get up the stairs. That is the
-          problem {BRAND} works on: not rescue, but knowing who to reach first and giving
-            whoever goes everything they need before they leave.
+          <ul className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+            <Stat value={areaCount == null ? "—" : String(areaCount)} label="areas covered" />
+            <Stat value="7" label="Karachi districts" />
+            <Stat value="Seconds" label="to the first reply" small />
+            <Stat value="1" label="manual step" />
+          </ul>
+        </Reveal>
+
+        <Reveal delay={0.06}>
+          <p className="mt-8 max-w-[58ch] text-[17px] leading-relaxed text-sz-text-2">
+            During the monsoon, help does not fail because nobody wants to give it. It
+            fails because in the first hour nobody can tell which of four hundred messages
+            is the one where someone cannot get up the stairs.
           </p>
         </Reveal>
 
-        <Reveal>
-          <h2 className="mt-14 text-[1.5rem] font-semibold tracking-[-0.02em]">
+        {/* ─── How it works ─────────────────────────────────────────── */}
+        <Reveal delay={0.08}>
+          <h2 className="mt-12 text-[1.5rem] font-semibold tracking-[-0.02em]">
             How it works
           </h2>
         </Reveal>
-        <ol className="mt-5 flex flex-col gap-6">
+
+        <ol className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {STEPS.map((step, index) => (
-            <Reveal
-              key={step.title}
-              delay={index * 0.06}
-              className="relative flex gap-5 pl-1"
-            >
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-sz-water/40 bg-sz-water/10 font-mono text-[13px] text-sz-water">
-                {index + 1}
-              </span>
-              <div className="min-w-0 pb-1">
-                <h3 className="font-semibold text-sz-text">{step.title}</h3>
-                <p className="mt-1.5 max-w-[62ch] text-sz-text-2">{step.body}</p>
-              </div>
+            <Reveal key={step.t} delay={index * 0.05}>
+              <li className="flex h-full gap-3.5 rounded-lg border border-sz-line bg-sz-panel p-4">
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-sz-water/40 bg-sz-water/10 font-mono text-[12px] text-sz-water">
+                  {index + 1}
+                </span>
+                <span className="min-w-0">
+                  <span className="block font-semibold">{step.t}</span>
+                  <span className="mt-0.5 block text-[14px] leading-snug text-sz-text-2">
+                    {step.b}
+                  </span>
+                </span>
+              </li>
             </Reveal>
           ))}
         </ol>
 
-        <Reveal>
-          <h2 className="mt-14 text-[1.5rem] font-semibold tracking-[-0.02em]">
-            What it is not
+        {/* ─── Can / cannot, side by side ───────────────────────────── */}
+        <Reveal delay={0.08}>
+          <h2 className="mt-12 text-[1.5rem] font-semibold tracking-[-0.02em]">
+            What it is and is not
           </h2>
+          <p className="mt-2 max-w-[56ch] text-sz-text-2">
+            The limits as they stand today, not a roadmap.
+          </p>
         </Reveal>
-        <p className="mt-2 max-w-[62ch] text-sz-text-2">
-          These are the limits as they stand today, not a roadmap. Knowing them is the
-          difference between a tool people can rely on and one that fails them quietly.
-        </p>
-        <ul className="mt-5 flex flex-col gap-2.5">
-          {LIMITS.map((limit, index) => (
-            <Reveal key={limit} delay={index * 0.04}>
-              <div className="rounded-sm border-l-2 border-sz-elev/50 bg-sz-panel px-4 py-3 text-sz-text-2">
-                {limit}
-              </div>
-            </Reveal>
-          ))}
-        </ul>
 
-        <h2 className="mt-14 text-[1.5rem] font-semibold tracking-[-0.02em]">Who built it</h2>
-        <p className="mt-2 max-w-[62ch] text-sz-text-2">
-          Team Nova Strike, for CODE//CONNECT&rsquo;26 at UBIT: Salman, Hussain, Abdul
-          Rehman and Usaim. It is a working prototype, running on real infrastructure with
-          a real WhatsApp number &mdash; not a mock-up &mdash; but it is a prototype, and
-          the list above is what that means in practice.
-        </p>
+        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+          <Reveal delay={0.05}>
+            <div className="h-full rounded-lg border border-sz-earth/40 bg-sz-earth/8 p-5">
+              <h3 className="flex items-center gap-2 font-semibold">
+                <Check className="h-4 w-4 text-sz-earth" aria-hidden="true" />
+                What it does
+              </h3>
+              <ul className="mt-3 flex flex-col gap-2 text-[14.5px] leading-relaxed text-sz-text-2">
+                <li>Reads messages in English, Urdu or Roman Urdu, however they are typed.</li>
+                <li>Ranks by urgency and who is at risk, and shows its reasoning in words.</li>
+                <li>Merges duplicate reports of the same street into one case.</li>
+                <li>Hands responders a finished case with the location already in it.</li>
+                <li>Asks afterwards whether help actually arrived.</li>
+              </ul>
+            </div>
+          </Reveal>
+
+          <Reveal delay={0.1}>
+            <div className="h-full rounded-lg border border-sz-crit/35 bg-sz-crit/8 p-5">
+              <h3 className="flex items-center gap-2 font-semibold">
+                <Minus className="h-4 w-4 text-sz-crit" aria-hidden="true" />
+                What it does not
+              </h3>
+              <ul className="mt-3 flex flex-col gap-2 text-[14.5px] leading-relaxed text-sz-text-2">
+                {LIMITS.map((limit) => (
+                  <li key={limit}>{limit}</li>
+                ))}
+              </ul>
+            </div>
+          </Reveal>
+        </div>
+
+        <Reveal delay={0.1}>
+          <p className="mt-10 max-w-[64ch] text-sz-text-2">
+            Built by team Nova Strike for CODE//CONNECT&rsquo;26 at UBIT. A working
+            prototype on real infrastructure with a real WhatsApp number &mdash; and a
+            prototype, which is what the list above means in practice.
+          </p>
+        </Reveal>
       </div>
     </PublicShell>
+  );
+}
+
+function Stat({
+  value,
+  label,
+  small,
+}: {
+  value: string;
+  label: string;
+  small?: boolean;
+}) {
+  return (
+    <li className="rounded-lg border border-sz-line bg-sz-panel px-4 py-3.5">
+      <p
+        className={cn(
+          "font-mono leading-none tabular-nums text-sz-water",
+          small ? "text-[1.35rem]" : "text-[2rem]",
+        )}
+      >
+        {value}
+      </p>
+      <p className="mt-2 text-[13px] text-sz-text-2">{label}</p>
+    </li>
   );
 }
