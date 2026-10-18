@@ -7,6 +7,7 @@ import Contact from "./pages/Contact";
 import Dashboard from "./pages/Dashboard";
 import Faq from "./pages/Faq";
 import Home from "./pages/Home";
+import Live from "./pages/Live";
 import Login from "./pages/Login";
 import Responder from "./pages/Responder";
 import Volunteers from "./pages/Volunteers";
@@ -51,6 +52,14 @@ export default function App() {
               <Splash>
                 <Dashboard />
               </Splash>
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/live"
+          element={
+            <RequireAuth>
+              <Live />
             </RequireAuth>
           }
         />

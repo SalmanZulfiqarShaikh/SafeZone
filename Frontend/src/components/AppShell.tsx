@@ -12,6 +12,7 @@ import { SimulatedTag } from "./SimulatedTag";
 
 const NAV = [
   { to: "/control", label: "Command", end: true },
+  { to: "/live", label: "Live", end: false },
   { to: "/volunteers", label: "Volunteers", end: false },
   { to: "/", label: "Public page", end: true },
 ];

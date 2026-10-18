@@ -6,7 +6,7 @@ import { useRef } from "react";
 import { BRAND, FRAMING } from "../lib/brand";
 import { SimulatedTag } from "./SimulatedTag";
 import { useWhatsapp } from "../hooks/useWhatsapp";
-import flooded from "../assets/photos/flooded-street.jpg";
+import flooded from "../assets/photos/back.png";
 
 /**
  * The hero.
@@ -49,14 +49,14 @@ export function Hero() {
         <img
           src={flooded}
           alt="A flooded main road in Karachi during the monsoon — one of the emergencies SafeZone handles, alongside fire, medical and people trapped."
-          className="h-[115%] w-full object-cover"
+          className="h-[115%] w-full object-cover brightness-[0.78] contrast-[1.5] saturate-[1.15]"
           loading="eager"
         />
         {/* Two layers rather than one: a flat wash would grey the photo out,
             while a gradient keeps the water readable at the top and gives the
             text a solid footing at the bottom. */}
-        <div className="absolute inset-0 bg-sz-header/72" />
-        <div className="absolute inset-0 bg-gradient-to-t from-sz-header via-sz-header/55 to-sz-header/35" />
+        <div className="absolute inset-0 bg-gradient-to-r from-sz-header/92 via-sz-header/65 to-sz-header/25" />
+        <div className="absolute inset-0 bg-gradient-to-t from-sz-header/90 via-sz-header/20 to-sz-header/40" />
       </motion.div>
 
       <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-20">
