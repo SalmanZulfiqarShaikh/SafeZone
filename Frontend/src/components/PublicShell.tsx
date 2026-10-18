@@ -8,6 +8,7 @@ import { StickyCta } from "./StickyCta";
 import { BRAND, FRAMING } from "../lib/brand";
 import { useTheme } from "../hooks/useTheme";
 import { cn } from "../lib/utils";
+import { ChatWidget } from "./chat/ChatWidget";
 
 /**
  * The chrome for the pages anyone can open.
@@ -145,6 +146,8 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </div>
         </div>
       </footer>
+
+      <ChatWidget />
     </div>
   );
 }
