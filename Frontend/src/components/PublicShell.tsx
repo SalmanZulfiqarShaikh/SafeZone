@@ -4,6 +4,7 @@ import { NavLink } from "react-router";
 import type { ReactNode } from "react";
 
 import { Brandmark } from "./AppShell";
+import { StickyCta } from "./StickyCta";
 import { BRAND, FRAMING } from "../lib/brand";
 import { useTheme } from "../hooks/useTheme";
 import { cn } from "../lib/utils";
@@ -102,7 +103,12 @@ export function PublicShell({ children }: { children: ReactNode }) {
 
       <main className="grow">{children}</main>
 
-      <footer className="border-t border-sz-header-line bg-sz-header px-4 py-9 text-sz-header-muted sm:px-5">
+      {/* Every public page, not just the landing page: whichever page someone
+          happens to be on when they decide they need help, the button is one
+          tap away. The extra bottom padding below is the room it sits in. */}
+      <StickyCta />
+
+      <footer className="border-t border-sz-header-line bg-sz-header px-4 pt-9 pb-24 text-sz-header-muted sm:px-5 sm:pb-9">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-7">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
             <div className="max-w-[48ch]">
@@ -134,10 +140,7 @@ export function PublicShell({ children }: { children: ReactNode }) {
           </div>
 
           <div className="flex flex-col gap-1.5 border-t border-sz-header-line pt-5 text-[13px] sm:flex-row sm:items-center sm:justify-between">
-            <p>
-              Built with <span aria-label="love">&#128151;</span> in Pakistan by team
-              NovaStrikers
-            </p>
+            <p>&copy; 2026 {BRAND}. All rights reserved.</p>
             <p>A CODE//CONNECT&rsquo;26 prototype. Not an emergency service.</p>
           </div>
         </div>

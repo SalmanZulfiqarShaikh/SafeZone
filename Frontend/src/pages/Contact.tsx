@@ -1,6 +1,7 @@
 import { CodeXml, ShieldCheck, TriangleAlert } from "lucide-react";
 import { FaGithub, FaWhatsapp } from "react-icons/fa6";
 import { QRCodeSVG } from "qrcode.react";
+import { useState } from "react";
 
 import { PageHeader } from "../components/PageHeader";
 import { PublicShell } from "../components/PublicShell";
@@ -25,11 +26,20 @@ import { useWhatsapp } from "../hooks/useWhatsapp";
 
 const REPO = "https://github.com/SalmanZulfiqarShaikh/CodeConnect-UBIT";
 
+/**
+ * Names and GitHub handles only. The handle is the single source of truth:
+ * the profile picture, the link and the fallback initial are all derived from
+ * it, so adding someone is one line and nobody's photo can point at the wrong
+ * profile.
+ *
+ * Roles are deliberately gone. Four people built this together over a
+ * weekend and the boundaries were never as clean as a label implies.
+ */
 const TEAM = [
-  { name: "Salman", role: "Backend, WhatsApp pipeline, infrastructure", url: "https://github.com/SalmanZulfiqarShaikh" },
-  { name: "Hussain", role: "Frontend, control room", url: "https://github.com/hussainabbas6706" },
-  { name: "Abdul Rehman", role: "Frontend, public pages", url: "https://github.com/mabdulrehmankhan666" },
-  { name: "Usaim", role: "Frontend", url: "https://github.com/usaim35" },
+  { name: "Salman", gh: "SalmanZulfiqarShaikh" },
+  { name: "Hussain", gh: "hussainabbas6706" },
+  { name: "Abdul Rehman", gh: "mabdulrehmankhan666" },
+  { name: "Usaim", gh: "usaim35" },
 ];
 
 export default function Contact() {
@@ -117,29 +127,10 @@ export default function Contact() {
           </div>
         </Reveal>
 
-        <ul className="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <ul className="mt-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
           {TEAM.map((member, index) => (
-            <Reveal key={member.name} delay={index * 0.05}>
-              <a
-                href={member.url}
-                target="_blank"
-                rel="noreferrer noopener"
-                className="group flex h-full flex-col rounded-lg border border-sz-line bg-sz-panel p-5 transition-colors hover:border-sz-water/55"
-              >
-                <span className="flex h-12 w-12 items-center justify-center rounded-full border border-sz-line bg-sz-base text-lg font-semibold text-sz-text-2 transition-colors group-hover:border-sz-water/50 group-hover:text-sz-water">
-                  {member.name.charAt(0)}
-                </span>
-                <span className="mt-3.5 flex items-center gap-2 font-semibold">
-                  {member.name}
-                  <FaGithub
-                    className="h-3.5 w-3.5 text-sz-text-3 transition-colors group-hover:text-sz-water"
-                    aria-hidden="true"
-                  />
-                </span>
-                <span className="mt-1 text-[13.5px] leading-relaxed text-sz-text-2">
-                  {member.role}
-                </span>
-              </a>
+            <Reveal key={member.gh} delay={index * 0.05}>
+              <Member {...member} />
             </Reveal>
           ))}
         </ul>
@@ -182,5 +173,57 @@ export default function Contact() {
         </div>
       </div>
     </PublicShell>
+  );
+}
+
+/**
+ * One person: their GitHub picture, large, and their name.
+ *
+ * `github.com/<handle>.png` redirects to the account's current avatar. No
+ * API token, no rate limit worth worrying about, and it follows whatever
+ * they change their picture to -- which is the whole reason not to commit
+ * four image files that go stale the first time somebody updates theirs.
+ *
+ * `?size=400` asks for a 400px source so the 112px circle stays sharp on a
+ * retina screen. If the request fails -- offline, or GitHub unreachable --
+ * the card falls back to the initial rather than leaving a broken frame.
+ */
+function Member({ name, gh }: { name: string; gh: string }) {
+  const [failed, setFailed] = useState(false);
+
+  return (
+    <a
+      href={`https://github.com/${gh}`}
+      target="_blank"
+      rel="noreferrer noopener"
+      className="group flex h-full flex-col items-center rounded-xl border border-sz-line bg-sz-panel p-5 text-center transition-colors hover:border-sz-water/55 sm:p-6"
+    >
+      {failed ? (
+        <span
+          aria-hidden="true"
+          className="flex size-20 items-center justify-center rounded-full border border-sz-line bg-sz-base text-2xl font-semibold text-sz-text-2 transition-colors group-hover:border-sz-water/60 group-hover:text-sz-water sm:size-28"
+        >
+          {name.charAt(0)}
+        </span>
+      ) : (
+        <img
+          src={`https://github.com/${gh}.png?size=400`}
+          alt=""
+          width={112}
+          height={112}
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="size-20 rounded-full border-2 border-sz-line object-cover transition-[border-color,transform] duration-200 group-hover:scale-[1.04] group-hover:border-sz-water/70 sm:size-28"
+        />
+      )}
+
+      <span className="mt-4 flex items-center justify-center gap-2 text-[16px] font-semibold sm:text-[17px]">
+        {name}
+        <FaGithub
+          className="h-4 w-4 shrink-0 text-sz-text-3 transition-colors group-hover:text-sz-water"
+          aria-hidden="true"
+        />
+      </span>
+    </a>
   );
 }

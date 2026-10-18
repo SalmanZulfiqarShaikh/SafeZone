@@ -165,7 +165,7 @@ function Fork({ nodes }: { nodes: Node[] }) {
 export function Flow() {
   return (
     <section className="border-y border-sz-line bg-sz-panel">
-      <div className="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6">
+      <div className="mx-auto w-full max-w-6xl px-4 py-14 sm:px-6 sm:py-16">
         <Reveal>
           <h2 className="text-[1.6rem] font-semibold tracking-[-0.025em] sm:text-[2rem]">
             What happens when you message
@@ -176,7 +176,11 @@ export function Flow() {
           </p>
         </Reveal>
 
-        <div className="mt-7 flex flex-col items-start gap-1 lg:flex-row lg:items-center lg:justify-between lg:gap-0">
+        {/* Held to a narrower measure than the heading above it and centred.
+            Stretched across the full container the nodes drift apart and the
+            arrows between them read as gaps rather than as a sequence. The
+            node sizes are unchanged -- this is composition, not scale. */}
+        <div className="mt-9 flex flex-col items-start gap-1 lg:mx-auto lg:max-w-5xl lg:flex-row lg:items-center lg:justify-between lg:gap-0">
           <Reveal>
             <Step node={START} size="lg" />
           </Reveal>
