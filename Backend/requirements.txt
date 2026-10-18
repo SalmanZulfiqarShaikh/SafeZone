@@ -6,3 +6,4 @@ python-dotenv
 supabase
 openai
 pytest
+qrcode

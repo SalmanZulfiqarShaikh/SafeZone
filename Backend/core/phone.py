@@ -82,3 +82,14 @@ def mask(phone: str) -> str:
         return "****"
     visible = digits[-4:]
     return "*" * (len(digits) - len(visible)) + visible
+
+
+def format_display(phone: str) -> str:
+    """Format a phone number for human display (e.g. +92 349 2468494).
+
+    Returns formatted international representation if valid, or clean input if not.
+    """
+    normalized = try_normalize(phone)
+    if normalized and normalized.startswith("92") and len(normalized) == 12:
+        return f"+{normalized[:2]} {normalized[2:5]} {normalized[5:]}"
+    return str(phone).strip() if phone is not None else ""

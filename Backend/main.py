@@ -18,7 +18,7 @@ from routes.register import router as register_router
 from routes.responder import router as responder_router
 from routes.volunteers import router as volunteers_router
 from routes.webhook import router as webhook_router
-from routes.whatsapp_public import router as whatsapp_router
+from routes.whatsapp import router as whatsapp_router
 from routes.zones import router as zones_router
 from services import silence
 
